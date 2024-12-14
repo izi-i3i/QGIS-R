@@ -50,13 +50,6 @@ if(Resolution <= 0){
   Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
 }
 
-
-# =========================================================================
-scientific_10 = function(x) {
-  ifelse(x==0, "0", parse(text = sub("e[+]?", " %*% 10^", scales::scientific_format()(x)))
-  )
-}
-
 # =========================================================================
 plot_variogram = function(vg, fit.vgm, model = NULL) {
   preds = variogramLine(fit.vgm, maxdist = max(vg$dist))
