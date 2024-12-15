@@ -1,3 +1,37 @@
+#' ALG_DESC: <p>This file creates a <span style='text-decoration: underline;'>Ordinary Kriging</span>.
+#'         : This script does Ordinary Kriging interpolation from a numeric field of a points vector layer.
+#'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
+#'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
+
+#' Layer: points vector layer.
+#' Field: numeric field from layer to interpolate.
+#' Extent: Specifies a numeric variable of length 4 values (xmin, xmax, ymin and ymax).
+#' Grid_method: Method to calculate the extent of interpolation.
+#'            : extent vectot and ConvexHull = create a shape is the smallest convex set that contains it.
+
+#' Expand_vector: <p>Expands longitude and latitude values by 0.01 (default)<br/>
+#'              : Expand longitude: value added to longitude.<br/>
+#'              : Expand latitude: value added to latitude</p>
+
+#' Model: Model type, Spherical, Exponential, Gaussian and Stein's parameterization.
+#'      : Can be a character vector of model types combined, e.g. [x] Spherical [x] Exponential, in which case the best fitting is returned.
+
+#' Local_kriging: Boolean. If checked, points to interpolate will be limited to a number of nearest observations,
+#' Number_of_nearest_observations: Maximun number of observations used in local kriging,
+#' Estimate_range_and_psill_initial_values_from_sample_variogram: Boolean. If checked, initial values for nugget, psill and range will be estimated from sample variogram.
+#' Nugget: Iniital value for nugget
+#' Psill: Initial value for partial sill
+#' Range: Initial value for range
+#' Show_Sum_of_Square_Errors: Boolean. If checked, it will show the sum of squared errors of the model fitting in R console output.
+#' Log10_field_kriging: log10(Field)~1
+#' Resolution: Cellsize of the interpolation raster, in meters.  Only for projected layers. Layers in lat-long will be interpolated over 5000 meter.
+#' Kriging_variance: Kriging variance of prediction
+#' Kriging_prediction: Kriging predicted value
+#' RPLOTS: <b style='text-decoration: underline;'>Output path</b> for html file with the scatterplot
+#' ALG_CREATOR: <a href=''>izi31416@protonmail.com</a>
+#' ALG_HELP_CREATOR: izi31416@protonmail.com
+#' ALG_VERSION: 0.0.1
+
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
 ##Layer=vector
@@ -7,7 +41,7 @@
 ##Expand_vector=boolean True
 ##Expand_longitude=number 0.01
 ##Expand_latitude=number 0.01
-##Model=enum multiple Spherical;Exponential;Gaussian;Stein's parameterization ;
+##Model=enum multiple Spherical;Exponential;Gaussian;Stein's parameterization
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
@@ -25,8 +59,8 @@
 ##Kriging_prediction= output raster
 
 # read packages ===========================================================
-packages = c("gstat", "ggpmisc", "raster", "ggplot2", "sp", "sf",
-             "raster","officer", "tictoc", "cowplot", "viridis", "ggrepel")
+packages = c("gstat", "ggpmisc", "ggplot2", "sp", "sf", "raster","officer",
+             "tictoc", "cowplot", "viridis", "ggrepel")
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
@@ -39,15 +73,13 @@ for (pac in packages) {
 tic()
 
 # =========================================================================
-# included in the report name
-periodo = format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 # extract crs
 crs_info = sf::st_crs(Layer)
 # scientific notation
 options(scipen = 10000)
 # automatic resolution
 if(Resolution <= 0){
-  Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
+  Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/400)
 }
 
 # =========================================================================
@@ -55,16 +87,29 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
   preds = variogramLine(fit.vgm, maxdist = max(vg$dist))
   breaks = pretty(range(vg$np), n = nclass.Sturges(vg$np)-1, min.n = 1)
 
+  mdf = as.data.frame(fit.vgm)[c("psill", "range")]
+
+  if(length(fit.vgm$model) < 2){
+    nugget = list(NULL)
+  } else {
+    nugget = list(geom_segment(data=mdf[1,], aes(x = range, y = 0, xend = range, yend = min(psill), color="Nugget"), linetype = 2))
+    mdf = mdf[2,]
+  }
+
   g1 = ggplot(data = vg, aes(x = dist, y = gamma)) +
     theme_bw() +
-    geom_point(aes(color=np, size=np), shape = 19, alpha = 1.0, show.legend = T) +
+    geom_line(linetype=2) +
+    geom_segment(data=mdf, aes(x = range, y = 0, xend = range, yend = psill, color="Range"), linetype = 2) +
+    geom_segment(data=mdf, aes(x = 0, y = psill, xend = Inf, yend = psill, color="Sill"), linetype = 2) +
+    nugget +
+    geom_point(aes(size=np, fill=np), shape= 21) +
+    geom_line(data = preds, aes(x = dist, y = gamma), linewidth = 1.0, inherit.aes = FALSE) +
     geom_text_repel(aes(label = np)) +
+    scale_y_continuous(limits = c(0, NA)) +
     scale_size_binned(range = c(1, 10), breaks=breaks) +
-    scale_color_viridis(option = Color_plots) +
-    geom_line(data = preds, aes(x = dist, y = gamma), inherit.aes = F) +
-    coord_cartesian(clip = 'off', ylim = c(0,NA), xlim=c(0,NA)) +
-    guides(color = guide_legend(), fill = guide_legend(), size = guide_legend()) +
-    labs(x = "distance", y = "semivariance")
+    scale_fill_viridis(option = Color_plots) +
+    guides(fill = guide_legend(), size = guide_legend()) +
+    labs(x = "distance", y = "semivariance", subtitle = "np: the number of point pairs for this estimate",color="")
     return(g1)
 }
 
@@ -142,18 +187,20 @@ if(Estimate_Range_and_Psill){ Psill = NA }
 
 # model
 Model = c("Sph", "Exp", "Gau", "Ste")[Model+1]
-vgm = vgm(nugget = Nugget, psill = Psill, range = Range, model = Model)
-fit_vgm = fit.variogram(vg, vgm)
+vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = Model)
+fit_vgm = fit.variogram(vg, vgm_)
 
 if(Show_Sum_of_Square_Errors){ paste("SSE:", attr(fit_vgm, "SSErr")) }
 
+mdf = as.data.frame(fit_vgm)[c("model", "psill", "range")]
 if(Create_report)
 {
   pv1 = plot_variogram(vg, fit_vgm, Model)
   pv2 = ggplot() +
     theme_void() +
-    annotate(geom='table', x=1, y=1, label=list(fit_vgm), size=4)
-  p1 = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(5, 1) )
+    annotate(geom='table', x=1, y=1, label=list(mdf), size=4)
+  p1 = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(6, 1) ) +
+    theme(plot.background = element_rect(fill = "white", colour = NA))
 }
 
 # grid ====================================================================
@@ -206,14 +253,46 @@ if(Create_report){
 Kriging_variance = VAR_RASTER
 Kriging_prediction = PRED_RASTER
 
-# =========================================================================
-if(Create_report)
-{
 # cross validation ========================================================
 KCV = krige.cv(Field~1, LAYER, fit_vgm, nmax = 25, nfold = 5, verbose = FALSE)
 KCV_DF = as.data.frame(KCV)
 # Mean error, ideally 0:
 mean_error_res = mean(KCV$residual)
+# MSPE, ideally small
+mspe = mean(KCV$residual^2)
+# Mean square normalized error, ideally close to 1
+mean_z2 = mean(KCV$zscore^2)
+# Correlation observed and predicted, ideally 1
+cor_obs_pred = cor(KCV$observed, KCV$var1.pred)
+# Correlation predicted and residual, ideally 0
+cor_pred_red = cor(KCV$var1.pred, KCV$residual)
+
+Result = c(mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red)
+Statistic = c("Mean error", "MSPE", "Mean square normalized error", "Correlation observed and predicted", "Correlation predicted and residual")
+Idealy = c("0","small","close to 1","1","0")
+
+Stat_DF = data.frame(Statistic, Result, Idealy)
+
+
+# =========================================================================
+print.info <- function (...){
+  cat("Model:","\n")
+  print(mdf, row.names = T)
+  cat("\nResolution:", Resolution,"pxs\n")
+  cat("\nStatistical:\n")
+  cat("Mean error residual, ideally 0:", mean_error_res, "\n")
+  cat("MSPE, ideally small:", mspe, "\n")
+  cat("Mean square normalized error, ideally: close to 1:", mean_z2, "\n")
+  cat("Correlation observed and predicted, ideally 1:", cor_obs_pred, "\n")
+  cat("Correlation predicted and residual, ideally 0:", cor_pred_red, "\n")
+
+}
+print.info()
+
+# =========================================================================
+if(Create_report & T)
+{
+
 # Calculating the Sturges bins
 breaks = pretty(range(KCV$residual), n = nclass.Sturges(KCV$residual), min.n = 1)
 
@@ -225,7 +304,6 @@ a1 = ggplot(KCV_DF, aes(x = residual)) +
   theme(panel.grid.minor = element_blank(), plot.title = element_text(size = 12)) +
   geom_vline(xintercept = mean_error_res, color="red", linetype=2) +
   labs(x="Residual", y="Count", title="Histogram")
-
 
 a2 = ggplot(KCV_DF, aes(x=observed, y=var1.pred)) +
   theme_bw(12) +
@@ -260,42 +338,24 @@ a4 = ggplot(KCV_DF, aes(sample = residual)) +
 
 g1 = plot_grid(a1,a2,a3,a4)
 
-# =========================================================================
-# MSPE, ideally small
-mspe = mean(KCV$residual^2)
-# Mean square normalized error, ideally close to 1
-mean_z2 = mean(KCV$zscore^2)
-# Correlation observed and predicted, ideally 1
-cor_obs_pred = cor(KCV$observed, KCV$var1.pred)
-# Correlation predicted and residual, ideally 0
-cor_pred_red = cor(KCV$var1.pred, KCV$residual)
 
-Result = c(mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red)
-Statistic = c("Mean error", "MSPE", "Mean square normalized error", "Correlation observed and predicted", "Correlation predicted and residual")
-Idealy = c("0","small","close to 1","1","0")
+title_ = fpar(ftext("Spatial Interpolation - Ordinary Kriging", prop = shortcuts$fp_bold(font.size = 15)))
 
-Stat_DF = data.frame(Statistic, Result, Idealy)
+txt_open = fpar(run_linebreak(),capture.output(print.info()))
 
+txt_crossvalidation = fpar("", run_linebreak())
 
-# ggplot(KCV_DF, aes(sample = rstandard(lm(var1.pred ~ observed)))) +
-#   stat_qq(size=2) +
-#   stat_qq_line(line.p = c(.25, .75)) +
-#   labs(title="Normal Q-Q", x="Theoretical Quantiles", y="Standardized Residuals")
+txt_variogram = fpar("", run_linebreak())
 
-title_ = fpar(ftext("Spatial interpolation", prop = shortcuts$fp_bold(font.size = 15)))
+txt_kriging = fpar("",run_linebreak())
 
-txt_crossvalidation = fpar(run_linebreak(),paste("Resolution:", Resolution), run_linebreak())
-
-txt_variogram = fpar(run_linebreak(),"Spatial interpolation techniques are used to estimate the values of variables at unsampled locations based on the values of the same variable at sampled locations. One of the popular spatial interpolation techniques used in geostatistics is Kriging interpolation. Kriging interpolation is a powerful statistical method that allows one to predict the values of variables at unsampled locations while also accounting for spatial autocorrelation.", run_linebreak())
-
-txt_kriging = fpar(run_linebreak(),"Spatial interpolation techniques are used to estimate the values of variables at unsampled locations based on the values of the same variable at sampled locations. One of the popular spatial interpolation techniques used in geostatistics is Kriging interpolation. Kriging interpolation is a powerful statistical method that allows one to predict the values of variables at unsampled locations while also accounting for spatial autocorrelation.",run_linebreak())
-
-txt_variance = fpar(run_linebreak(),"Spatial interpolation techniques are used to estimate the values of variables at unsampled locations based on the values of the same variable at sampled locations. One of the popular spatial interpolation techniques used in geostatistics is Kriging interpolation. Kriging interpolation is a powerful statistical method that allows one to predict the values of variables at unsampled locations while also accounting for spatial autocorrelation.",run_linebreak())
+txt_variance = fpar("",run_linebreak())
 
 run_num = run_autonum(seq_id = "fig", pre_label = "Figure ", bkm = "figure")
 
 doc = read_docx() |>
   body_add(title_) |>
+  body_add(value = txt_open, style = "Normal") |>
 
   body_add_par(value = "Cross Validation", style = "heading 1") |>
   body_add(value = txt_crossvalidation, style = "Normal") |>
@@ -310,7 +370,7 @@ doc = read_docx() |>
   body_add_par(value = "Ordinary krigind simulation", style = "heading 1") |>
   body_add(value = txt_kriging, style = "Normal") |>
   body_add_gg(value = p2, width = 6.3, height = 6.3, res=150) |>
-  body_add_caption(value = block_caption("A figure caption.", style = "Normal", autonum = run_num)) |>
+  body_add_caption(value = block_caption(paste("Resolution:", Resolution), style = "Normal", autonum = run_num)) |>
 
   body_add_par(value = "Ordinary krigind variance", style = "heading 1") |>
   body_add(value = txt_variance, style = "Normal") |>
@@ -320,16 +380,17 @@ doc = read_docx() |>
   body_add_par(value = "Session Info", style = "heading 1") |>
   body_add(value = capture.output(sessionInfo()), style = "Normal")
 
+# arq = file.path(Plots_directory, paste0("report_", periodo, ".docx"))
 print(doc, target = Report)
 browseURL(Report)
 }
 
-nome_doc = paste("kriging on the vector", Field)
+nome_doc = paste("kriging on the field vector:", Field)
 msg_toc = function(tic,toc,msg,arq){
   paste(" ----------------------------------\n",
         arq, "\n",
         "R algorithm completed in",round(toc - tic, 3), "seconds\n",
         "----------------------------------\n")
 }
+# =========================================================================
 toc(func.toc = msg_toc, arq=nome_doc)
-
