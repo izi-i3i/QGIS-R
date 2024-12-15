@@ -267,13 +267,6 @@ cor_obs_pred = cor(KCV$observed, KCV$var1.pred)
 # Correlation predicted and residual, ideally 0
 cor_pred_red = cor(KCV$var1.pred, KCV$residual)
 
-Result = c(mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red)
-Statistic = c("Mean error", "MSPE", "Mean square normalized error", "Correlation observed and predicted", "Correlation predicted and residual")
-Idealy = c("0","small","close to 1","1","0")
-
-Stat_DF = data.frame(Statistic, Result, Idealy)
-
-
 # =========================================================================
 print.info <- function (...){
   cat("Model:","\n")
@@ -337,7 +330,6 @@ a4 = ggplot(KCV_DF, aes(sample = residual)) +
   labs(x="Theoretical Quantiles", y="Residual Quantiles", title="Q-Q Plot")
 
 g1 = plot_grid(a1,a2,a3,a4)
-
 
 title_ = fpar(ftext("Spatial Interpolation - Ordinary Kriging", prop = shortcuts$fp_bold(font.size = 15)))
 
