@@ -290,7 +290,7 @@ print.info <- function (...){
 print.info()
 
 # =========================================================================
-if(Create_report & T)
+if(Create_report)
 {
 
 # Calculating the Sturges bins
