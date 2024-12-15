@@ -18,7 +18,6 @@
 #' ALG_HELP_CREATOR: i3i
 #' ALG_VERSION: 0.0.1
 
-
 ##[Spatial Points]=group
 ##Spatial sampling=name
 ##QgsProcessingParameterFeatureSource|Layer_vector|Vector|-1|None|True
