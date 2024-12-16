@@ -28,7 +28,7 @@
 ##QgsProcessingParameterNumber|Clusters|Clusters|QgsProcessingParameterNumber.Integer|5
 #QgsProcessingParameterNumber|Seed|Seed|QgsProcessingParameterNumber.Integer|None
 ##QgsProcessingParameterNumber|Iter|Iteraction|QgsProcessingParameterNumber.Integer|4
-###Set_seed=optional number
+##Set_seed=optional number
 ##Spatial_sampling=output vector
 if(is.null(Layer_raster) & is.null(Layer_vector)) {stop("Insert a layer RASTER or VECTOR")}
 
