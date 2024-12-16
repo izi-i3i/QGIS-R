@@ -14,6 +14,7 @@
 #' Model: Model type, Spherical, Exponential, Gaussian and Stein's parameterization.
 #'      : Can be a character vector of model types combined, e.g. [x] Spherical [x] Exponential, in which case the best fitting is returned.
 #' Local_kriging: If checked, points to interpolate will be limited to a number of nearest observations.
+#' Number_of_nearest_observations: Maximun number of observations used in local kriging.
 #' Estimate_Range_and_Psill: Boolean. If checked, initial values for nugget, psill and range will be estimated from sample variogram.
 #' Nugget: Iniital value for nugget
 #' Psill: Initial value for partial sill
