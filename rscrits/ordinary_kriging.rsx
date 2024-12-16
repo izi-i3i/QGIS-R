@@ -28,8 +28,8 @@
 #' Kriging_variance: Kriging variance of prediction
 #' Kriging_prediction: Kriging predicted value
 #' RPLOTS: <b style='text-decoration: underline;'>Output path</b> for html file with the scatterplot
-#' ALG_CREATOR: <a href=''>izi31416@protonmail.com</a>
-#' ALG_HELP_CREATOR: izi31416@protonmail.com
+#' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
+#' ALG_HELP_CREATOR: izi-i3i
 #' ALG_VERSION: 0.0.1
 
 ##Ordinary Kriging=name
