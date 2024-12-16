@@ -26,7 +26,6 @@
 ##Type=enum Random;Regular;Stratified;Nonaligned;Hexagonal;Clustered ;
 ##QgsProcessingParameterNumber|Size|Size|QgsProcessingParameterNumber.Integer|100
 ##QgsProcessingParameterNumber|Clusters|Clusters|QgsProcessingParameterNumber.Integer|5
-#QgsProcessingParameterNumber|Seed|Seed|QgsProcessingParameterNumber.Integer|None
 ##QgsProcessingParameterNumber|Iter|Iteraction|QgsProcessingParameterNumber.Integer|4
 ##Set_seed=optional number
 ##Spatial_sampling=output vector
