@@ -60,8 +60,8 @@ packages = c("gstat", "ggpmisc", "ggplot2", "sp", "sf", "raster","officer",
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
-    install.packages(package, repos = getOption("repos"), dependencies=TRUE)
-    cat("package installed:", paste(package, collapse = ", "),"\n")
+    install.packages(pac, repos = getOption("repos"), dependencies=TRUE)
+    cat("package installed:", paste(pac, collapse = ", "),"\n")
   }
 }
 
