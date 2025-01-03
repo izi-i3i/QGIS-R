@@ -200,8 +200,6 @@ if(Log_Field)
 {
   LAYER$Field = log(LAYER$Field)
   Field = paste0("log(", Field,")")
-} else {
-  Field = NULL
 }
 
 # VARIOGRAM ========================================
