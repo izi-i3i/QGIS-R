@@ -39,9 +39,6 @@
 #' ALG_HELP_CREATOR: izi-i3i
 #' ALG_VERSION: 0.0.4
 
-#teste=expression @project_crs
-#print(teste)
-
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
 ##Layer=vector
