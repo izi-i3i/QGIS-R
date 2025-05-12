@@ -2,8 +2,9 @@
 #'         : This script does Ordinary Kriging interpolation from a numeric field of a points vector layer.
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
 #'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
-#' Layer: points vector layer.
-#' Field: numeric field from layer to interpolate.
+#' Layer: Points vector layer.
+#' CRS_Layer: Transform to UTM. The coordinates must be in meters.
+#' Field: Numeric field from layer to interpolate.
 #' Log_Field: If checked, logarithmize the vector values. Field = log(Field)
 #' Extent: Specifies a numeric variable of length 4 values (xmin, xmax, ymin and ymax).
 #' Grid_method: Method to calculate the extent of interpolation.
@@ -11,8 +12,8 @@
 #'            : Convex hull = Compute Convex Hull of a set of points.
 #' Expand_vector: If checked, expands the longitude and latitude (only in rectangle) values by the value in
 #'              : Expand_longitude and Expand_latitude
-#' Expand_longitude: value added to longitude.
-#' Expand_latitude: value added to latitude.
+#' Expand_longitude: Value added to longitude.
+#' Expand_latitude: Value added to latitude.
 #' Model: Spherical (Sph), Exponential (Exp), Gaussian (Gau), Matern (Mat),
 #'      : Matern Stein's parameterization (Ste), Exponential class (Exc),
 #'      : Circular (Cir), Linear (Lin), Bessel (Bes), Pentaspherical (Pen),
@@ -27,6 +28,7 @@
 #' Psill: Initial value for partial sill
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
+#' Set_Seed: Define seed.
 #' Color_plots: Select color palette: turbo, magma, inferno, plasma, viridis, cividis, rocket, mako
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
@@ -35,14 +37,19 @@
 #' Kriging_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.3
+#' ALG_VERSION: 0.0.4
+
+#teste=expression @project_crs
+#print(teste)
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
 ##Layer=vector
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Transform to UTM)|EPSG:31980
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
+##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle; Convex hull ;
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
@@ -55,10 +62,12 @@
 ##Local_kriging=boolean False
 ##QgsProcessingParameterNumber|nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
 ##QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
+##Set_Seed=boolean True
+##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
 ##Color_plots=enum literal turbo;magma;inferno;plasma;viridis;cividis;rocket;mako ;
 ##Create_report=boolean True
 ##Insert_points=boolean True
-##Draw_lines_variogram=boolean True
+##Draw_lines_variogram=boolean False
 ##Report=output file docx
 ##Open_report=boolean False
 ##Kriging_variance=output raster
@@ -74,17 +83,7 @@ for (pac in packages) {
   }
 }
 
-# PROCESSING TIME =================================
-tic()
-
-# INFO ============================================
-# scientific notation
-options(scipen = 10000)
-# extract crs
-crs_info = sf::st_crs(Layer)
-epsg_crs = paste0("EPSG: ", crs_info$epsg, " CRS: ",st_crs(st_sfc(crs = crs_info$epsg))$Name)
-
-# =================================================
+# FUNCTION PLOT_VARIOGRAM =================================================
 plot_variogram = function(vg, fit.vgm, model = NULL) {
   preds = variogramLine(fit.vgm, maxdist = max(vg$dist))
   breaks = pretty(range(vg$np), n = nclass.Sturges(vg$np)-1, min.n = 1)
@@ -96,10 +95,10 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
     nrp_line = list(
       geom_hline(yintercept = max(MDF$psill), linetype = 2, color = "gray55"),
       geom_vline(xintercept = max(MDF$range), linetype = 2, color = "gray55"),
-      geom_segment(data=MDF, aes(x = 0, y = 0, xend = range, yend = 0, color="Range"),
-                   linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
-      geom_segment(data=MDF, aes(x = max(range), y=0, xend=max(range), yend=max(psill), color="Psill"),
-                   linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both"))
+       geom_segment(data=MDF, aes(x = 0, y = 0, xend = range, yend = 0, color="Range"),
+                    linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
+       geom_segment(data=MDF, aes(x = max(range), y=0, xend=max(range), yend=max(psill), color="Psill"),
+                    linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both"))
     )
   } else {
     L1 = data.frame(x = 0, y = 0, xend = 0, yend = min(MDF$psill))
@@ -109,12 +108,12 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
     nrp_line = list(
       geom_hline(yintercept=max(MDF$psill), linetype=2, color="gray55"),
       geom_vline(xintercept=max(MDF$range), linetype=2, color="gray55"),
-      geom_segment(data=L1, aes(x = x, y = y, xend = xend, yend = yend, color="Nugget"),
-                   linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
-      geom_segment(data=L2, aes(x = x, y = y, xend = xend, yend = yend, color="Range"),
-                   linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
-      geom_segment(data=L3, aes(x = x, y = y, xend = xend, yend = yend, color="PSill"),
-                   linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both"))
+       geom_segment(data=L1, aes(x = x, y = y, xend = xend, yend = yend, color="Nugget"),
+                    linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
+       geom_segment(data=L2, aes(x = x, y = y, xend = xend, yend = yend, color="Range"),
+                    linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both")),
+       geom_segment(data=L3, aes(x = x, y = y, xend = xend, yend = yend, color="PSill"),
+                    linetype = 1, arrow = arrow(length = unit(0.15,"cm"), ends="both"))
     )
   }
 
@@ -138,7 +137,7 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
     return(g1)
 }
 
-# =================================================
+# FUNCTION GET_GRID =================================================
 get_grid = function (layer,
                      resolution,
                      grid.method = c('Rectangle','Convex hull'),
@@ -187,7 +186,30 @@ get_grid = function (layer,
   return(gride)
 }
 
-# =================================================
+# PROCESSING TIME =================================
+tic()
+
+if(Set_Seed) set.seed(Seed)
+
+# LAYER TRANSFORM =================================
+Layer = st_transform(Layer, crs = CRS_Layer)
+
+# INFO ============================================
+# scientific notation
+options(scipen = 9999)
+# extract crs
+crs_info = sf::st_crs(Layer)
+crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
+crs_num = crs_info$epsg
+epsg_crs_txt = paste0("EPSG: ", crs_num, " CRS: ", st_crs(st_sfc(crs = crs_num))$Name)
+
+# CRS ==============================================
+ex = data.frame(x=Extent[1:2], y=Extent[3:4])
+L1 = st_as_sf(ex, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
+L2 = st_transform(L1, crs = CRS_Layer)
+Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
+
+# LAYER ============================================
 LAYER = as_Spatial(Layer)
 LAYER = crop(LAYER, Extent)
 
@@ -324,7 +346,7 @@ if(Create_report)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs)
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
 }
 
 # PLOT VARIOGRAM ========================================
@@ -345,7 +367,7 @@ if(Create_report)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs)
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
 }
 
 # OUT =================================================
@@ -512,6 +534,9 @@ if(Create_report)
     body_add_caption(value = block_caption(cap_fig_p3, style = "Normal", autonum = run_num)) |>
 
     body_add_break() |>
+
+    body_add_par(value = "Warnings", style = "heading 1") |>
+    body_add(value = capture.output(summary(warnings())), style = "Normal") |>
 
     body_add_par(value = "Session Info", style = "heading 1") |>
     body_add(value = capture.output(sessionInfo()), style = "Normal")
