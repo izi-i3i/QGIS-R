@@ -276,23 +276,30 @@ vg = variogram(g)
 
 if(any(model %in% "Pow"))
 {
-  if(Estimate_Range_and_Psill){ Range = 1 }
-  if(Estimate_Range_and_Psill){ Psill = NA }
-  vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
+  if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
+  vgm_ = vgm(nugget = 0, psill = Psill, range = Range, model = model)
   fit_vgm = fit.variogram(vg, model = vgm_, fit.kappa = F)
+
 } else if(any(model %in% "Nug")) {
-  if(Estimate_Range_and_Psill){ Range = NA }
-  if(Estimate_Range_and_Psill){ Psill = NA }
-  vgm_ = vgm(pasill=NA, range = NA, model = model)
+
+  if(Estimate_Range_and_Psill){ Range = NA; Psill = NA }
+  vgm_ = vgm(psill = Psill, range = Range, model = model)
   fit_vgm = fit.variogram(object=vg, model=vgm_)
+
 } else {
-  if(Estimate_Range_and_Psill){ Range = NA }
-  if(Estimate_Range_and_Psill){ Psill = NA }
+
+  if(Estimate_Range_and_Psill)
+  {
+    Psill = max(vg$gamma)*0.9
+    Range = max(vg$dist)/2
+    Nugget = mean(vg$gamma)/4
+  }
   vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
   fit_vgm = fit.variogram(vg, model = vgm_, fit.kappa = F)
 }
 
 MDF = as.data.frame(fit_vgm)[c("model", "psill", "range", "kappa")]
+
 if(Create_report)
 {
   pv1 = plot_variogram(vg, fit_vgm, Model)
