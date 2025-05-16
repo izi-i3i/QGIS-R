@@ -3,7 +3,7 @@
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
 #'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
 #' Layer: Points vector layer.
-#' CRS_Layer: Transform to UTM. The coordinates must be in meters.
+#' CRS_Layer: Planar coordinates.
 #' Field: Numeric field from layer to interpolate.
 #' Log_Field: If checked, logarithmize the vector values. Field = log(Field)
 #' Extent: Specifies a numeric variable of length 4 values (xmin, xmax, ymin and ymax).
@@ -42,7 +42,7 @@
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
 ##Layer=vector
-##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Transform to UTM)|EPSG:31980
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordinates)|EPSG:3395
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
@@ -313,7 +313,7 @@ if(Create_report)
 # Automatic resolution
 # =========================================================================
 if(Resolution <= 0) {
-  Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/400)
+  Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/1000)
 }
 
 # GRID =================================================
