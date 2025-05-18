@@ -47,11 +47,11 @@
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
-##Grid_method=enum literal Rectangle; Convex hull ;
+##Grid_method=enum literal Rectangle;Convex hull ;
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
-##Model=enum multiple Spherical (Sph); Exponential (Exp); Gaussian (Gau); Matern (Mat); Matern Stein's parameterization (Ste); Exponential class (Exc); Circular (Cir); Linear (Lin); Bessel (Bes); Pentaspherical (Pen);  Periodic (Per); Wave (Wave); Hole (Hol); Logarithmic (Log); Spline (Spl); Power (Pow); Nugget (Nug)
+##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
