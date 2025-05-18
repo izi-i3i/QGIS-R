@@ -29,7 +29,7 @@
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
 #' Set_Seed: Define seed.
-#' Color_plots: Select color palette: turbo, magma, inferno, plasma, viridis, cividis, rocket, mako
+#' Color_report: Select color palette: Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
 #' Report: Directory and name of the report (docx) to be saved.
@@ -37,7 +37,7 @@
 #' Kriging_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.4
+#' ALG_VERSION: 0.0.5
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
@@ -61,7 +61,7 @@
 ##QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
 ##Set_Seed=boolean True
 ##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
-##Color_plots=enum literal turbo;magma;inferno;plasma;viridis;cividis;rocket;mako ;
+##Color_report=enum literal Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Create_report=boolean True
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean False
@@ -127,7 +127,7 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
     geom_text_repel(aes(label = np)) +
     scale_y_continuous(limits = c(0, NA)) +
     scale_size_binned(range = c(1, 10), breaks = breaks, name = "n point pairs") +
-    scale_fill_viridis(option = Color_plots) +
+    scale_fill_viridis(option = Color_report) +
     guides(fill = guide_legend(order=0), size = guide_legend(order=0), color = guide_legend()) +
     labs(x = "distance", y = "semivariance", fill = "n point pairs", color = "")
 
@@ -187,6 +187,7 @@ get_grid = function (layer,
 tic()
 
 if(Set_Seed) set.seed(Seed)
+Color_report = tolower(Color_report)
 
 # LAYER TRANSFORM =================================
 Layer = st_transform(Layer, crs = CRS_Layer)
@@ -342,7 +343,7 @@ if(Create_report)
     theme_bw() +
     geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y))), list(NULL)) +
-    scale_fill_viridis(option = Color_plots, name=Field, na.value="transparent") +
+    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
     coord_fixed(expand = TRUE, clip = "off") +
@@ -363,7 +364,7 @@ if(Create_report)
     theme_bw() +
     geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y))), list(NULL)) +
-    scale_fill_viridis(option = Color_plots, name=Field, na.value="transparent") +
+    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
     coord_fixed(expand = TRUE, clip = "off") +
@@ -447,7 +448,7 @@ if(Create_report)
     theme_bw(12) +
     geom_point(aes(fill = residual, size = residual), alpha=.5, shape=21) +
     scale_size_area(max_size = 8) +
-    scale_fill_viridis(option = Color_plots) +
+    scale_fill_viridis(option = Color_report) +
     guides(fill = guide_legend(), size = guide_legend()) +
     theme(plot.title = element_text(size = 12),
           legend.title = element_blank(),
