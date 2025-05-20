@@ -1,4 +1,4 @@
-#' ALG_DESC: <p>This file creates a <span style='text-decoration: underline;'>Ordinary Kriging</span>.
+#' ALG_DESC: <p>This file creates a <span style='text-decoration: underline;'>Universal Kriging</span>.
 #'         : This script does Ordinary Kriging interpolation from a numeric field of a points vector layer.
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
 #'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
@@ -32,13 +32,13 @@
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
 #' Report: Directory and name of the report (docx) to be saved.
-#' Kriging_variance: Kriging variance of prediction (raster)
-#' Kriging_prediction: Kriging predicted value (raster)
+#' UK_variance: Kriging variance of prediction (raster)
+#' UK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
 #' ALG_VERSION: 0.0.1
 
-##Ordinary Kriging=name
+##Universal Kriging=name
 ##[R-Geostatistics]=group
 ##Layer=vector
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
@@ -66,8 +66,9 @@
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
 ##Open_report=boolean False
-##Kriging_variance=output raster
-##Kriging_prediction=output raster
+##UK_variance=output raster
+##UK_prediction=output raster
+
 
 # PROCESSING TIME =================================
 tictoc::tic()
@@ -114,11 +115,7 @@ if(Set_Seed) set.seed(Seed)
 Color_report = tolower(Color_report)
 
 # LAYER TRANSFORM =================================
-Layer = sf::st_as_sf(Layer)
-st_crs(Layer) <- CRS_Layer
 Layer = st_transform(Layer, crs = CRS_Layer)
-
-# raster::crop()
 
 # INFO ============================================
 # scientific notation
@@ -267,13 +264,13 @@ kpred = predict(g, newdata = GRIDE)
 
 if(Local_kriging)
 {
-  OK = krige(frm, locations=LAYER, newdata = kpred, var_model, nmax = Nearest_observations, block = c(40,40))
+  UK = krige(frm, locations=LAYER, newdata = kpred, var_model, nmax = Nearest_observations, block = c(40,40))
 } else {
-  OK = krige(frm, locations=LAYER, newdata = kpred, var_model, block = c(40,40))
+  UK = krige(frm, locations=LAYER, newdata = kpred, var_model, block = c(40,40))
 }
 
 # PLOT KRIGING =========================================
-PRED_RASTER = raster(OK)
+PRED_RASTER = raster(UK)
 PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
 LAYER_DF = as.data.frame(LAYER)
 
@@ -295,7 +292,7 @@ if(Create_report)
 }
 
 # PLOT VARIOGRAM ========================================
-VAR_RASTER = raster(OK["var1.var"])
+VAR_RASTER = raster(UK["var1.var"])
 VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
 
 if(Create_report)
@@ -380,8 +377,8 @@ printInfo()
 create_report(Create_report, Open_report)
 
 # OUT =================================================
-Kriging_variance = VAR_RASTER
-Kriging_prediction = PRED_RASTER
+UK_variance = VAR_RASTER
+UK_prediction = PRED_RASTER
 
 # ======================================================
 nome_doc = paste("kriging on the field vector:", Field)
