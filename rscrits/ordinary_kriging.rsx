@@ -42,33 +42,41 @@
 ##[R-Geostatistics]=group
 ##Layer=vector
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
+
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
+
 ##Grid_method=enum literal Rectangle;Convex hull ;
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
+
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
 ##Psill=number 0
+
 ##Local_kriging=boolean False
 ##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
-##QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
+
+#QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
+##Resolution=string "auto"
+
 ##Set_Seed=boolean True
 ##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
-##Color_report=enum literal Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
+
 ##Create_report=boolean True
+##Open_report=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
+##Color_report=enum literal Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Report=output file docx
-##Open_report=boolean False
+
 ##OK_variance=output raster
 ##OK_prediction=output raster
-
 
 # PROCESSING TIME =================================
 tictoc::tic()
@@ -115,8 +123,6 @@ if(Set_Seed) set.seed(Seed)
 Color_report = tolower(Color_report)
 
 # LAYER TRANSFORM =================================
-#Layer = sf::st_as_sf(Layer)
-#st_crs(Layer) <- CRS_Layer
 Layer = st_transform(Layer, crs = CRS_Layer)
 
 # INFO ============================================
@@ -194,35 +200,6 @@ frm = formula('Field~1')
 g = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(g)
 
-if(F){ #NOTE: Decidir qual o melhor
-
-if(any(model %in% "Pow"))
-{
-  if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
-  vgm_ = vgm(nugget = 0, psill = Psill, range = Range, model = model)
-  var_model = fit.variogram(vg, model = vgm_, fit.kappa = F)
-
-} else if(any(model %in% "Nug")) {
-
-  if(Estimate_Range_and_Psill){ Range = NA; Psill = NA }
-  vgm_ = vgm(psill = Psill, range = Range, model = model)
-  var_model = fit.variogram(object=vg, model=vgm_)
-
-} else {
-
-  if(Estimate_Range_and_Psill) {
-    Psill = max(vg$gamma)*0.9
-    Range = max(vg$dist)/2
-    Nugget = mean(vg$gamma)/4
-  }
-  vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
-#   vgm_ = vgm(nugget = NA, psill = NA, range = NA, model = model)
-
-  var_model = fit.variogram(vg, model = vgm_, fit.kappa = T)
-}
-
-} else {#NOTE: Decidir qual o melhor
-
 fit_var = autofitVariogram(frm,
                              LAYER,
                              model = model,
@@ -236,24 +213,13 @@ fit_var = autofitVariogram(frm,
 var_model = fit_var$var_model
 exp_var = fit_var$exp_var
 var_sserr = fit_var$sserr
-}
-
-MDF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
-
-if(Create_report)
-{
-  pv1 = plot_variogram(vg, var_model, Model)
-  pv2 = ggplot() +
-    theme_void() +
-    annotate(geom='table', x=1, y=1, label=list(MDF), size=4)
-  p1 = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(6, 1) ) +
-    theme(plot.background = element_rect(fill = "white", colour = NA))
-}
+VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
 
 # AUTOMATIC RESOLUTION ====================================================
-if(Resolution <= 0) {
-  Resolution = round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
-}
+Resolution = tryCatch(abs(as.integer(Resolution)),
+    warning = function(w) {
+     round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/400)
+    })
 
 # GRID =================================================
 GRIDE = get_grid(layer = LAYER, resolution = Resolution,
@@ -270,69 +236,9 @@ if(Local_kriging)
   OK = krige(frm, LAYER, newdata = kpred, var_model)
 }
 
-# PLOT KRIGING =========================================
-PRED_RASTER = raster(OK)
-PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
-LAYER_DF = as.data.frame(LAYER)
-
-if(Create_report)
-{
-  p2 = ggplot() +
-    theme_bw() +
-    geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
-    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
-    scale_y_continuous(expand = expansion(mult=0.01)) +
-    scale_x_continuous(expand = expansion(mult=0.01)) +
-    coord_fixed(expand = TRUE, clip = "off") +
-    theme(axis.text.y = element_text(angle=90, hjust=.5),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
-}
-
-# PLOT VARIOGRAM ========================================
+# RASTER ==================================================================
+PRED_RASTER = raster(OK["var1.pred"])
 VAR_RASTER = raster(OK["var1.var"])
-VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
-
-if(Create_report)
-{
-  p3 = ggplot() +
-    theme_bw() +
-    geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
-    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
-    scale_y_continuous(expand = expansion(mult=0.01)) +
-    scale_x_continuous(expand = expansion(mult=0.01)) +
-    coord_fixed(expand = TRUE, clip = "off") +
-    theme(axis.text.y = element_text(angle = 90, hjust = 0.5),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
-}
-
-# =========================================================================
-if(Create_report)
-{
-  # variogram calculation, cloud=TRUE is for cloud scatter 
-  meuse.varioc <- variogram(frm, LAYER, cloud=TRUE)
-
-  # Customizing the cloud plot
-  p4 = ggplot(meuse.varioc, aes(x=meuse.varioc$dist, y=meuse.varioc$gamma)) + 
-    geom_point(color = "blue", fill = "blue", size = 2, alpha = 0.25) +
-    scale_x_continuous(expand = expansion(mult=0.03)) +
-    scale_y_continuous(expand = expansion(mult=0.01)) +
-    theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
-#           axis.text.y = element_text(angle = 90, hjust = 0.5),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(title = NULL,
-         x = "h(m)",
-         y = bquote(gamma~"(h)"))
-}
 
 # CROSS VALIDATION =====================================
 KCV = krige.cv(frm, LAYER, var_model, nmax = 25, nfold = 5, verbose = FALSE)
@@ -362,7 +268,7 @@ STAT = data.frame(Stat = c("Sum of Squares Error (SSE)",
 printInfo <- function()
 {
   cat("Model:","\n")
-  print(MDF, row.names = T,right = T)
+  print(VAR_DF, row.names = T,right = T)
   cat("\nResolution:", Resolution,"meter\n")
   cat("\nStatistical:\n")
   cat("SSE:", attr(var_model, "SSErr"),"\n")
@@ -375,7 +281,7 @@ printInfo <- function()
 printInfo()
 
 # REPORT ==============================================
-create_report(Create_report, Open_report)
+rp = create_report(Create_report, Open_report)
 
 # OUT =================================================
 OK_variance = VAR_RASTER
