@@ -4,9 +4,72 @@
 ## created     : terça mai 20, 2025 12:00:51 -03
 ## Updated     :
 ##-------------------------------------------
-create_report = function(Create_report = FALSE, Open_report = FALSE)
+create_report = function(cr = TRUE, or = FALSE)
 {
-  if(!Create_report) return(NULL)
+  if(!cr) return(NULL)
+
+
+  # PLOT VARIOGRAM ========================================
+  pv1 = plot_variogram(vg, var_model, Model)
+  pv2 = ggplot() +
+    theme_void() +
+    annotate(geom='table', x=1, y=1, label=list(VAR_DF), size=4)
+  p1 = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(6, 1) ) +
+    theme(plot.background = element_rect(fill = "white", colour = NA))
+
+
+  # PLOT KRIGING =========================================
+  PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
+  LAYER_DF = as.data.frame(LAYER)
+
+  p2 = ggplot() +
+    theme_bw() +
+    geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
+    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
+    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+    scale_y_continuous(expand = expansion(mult=0.01)) +
+    scale_x_continuous(expand = expansion(mult=0.01)) +
+    coord_fixed(expand = TRUE, clip = "off") +
+    theme(axis.text.y = element_text(angle=90, hjust=.5),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'white')
+          ) +
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
+
+  # PLOT VARIOGRAM ========================================
+  VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
+
+  p3 = ggplot() +
+    theme_bw() +
+    geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
+    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
+    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+    scale_y_continuous(expand = expansion(mult=0.01)) +
+    scale_x_continuous(expand = expansion(mult=0.01)) +
+    coord_fixed(expand = TRUE, clip = "off") +
+    theme(axis.text.y = element_text(angle = 90, hjust = 0.5),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'white')
+          ) +
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
+
+  # CLOUD VARIOGRAM =========================================================
+  # variogram calculation, cloud=TRUE is for cloud scatter 
+  meuse.varioc <- variogram(frm, LAYER, cloud=TRUE)
+
+  # Customizing the cloud plot
+  p4 = ggplot(meuse.varioc, aes(x=meuse.varioc$dist, y=meuse.varioc$gamma)) + 
+    geom_point(color = "blue", fill = "blue", size = 2, alpha = 0.25) +
+    scale_x_continuous(expand = expansion(mult=0.03)) +
+    scale_y_continuous(expand = expansion(mult=0.01)) +
+    theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
+          #           axis.text.y = element_text(angle = 90, hjust = 0.5),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'white')
+          ) +
+    labs(title = NULL,
+         x = "h(m)",
+         y = bquote(gamma~"(h)"))
 
   # Calculating the Sturges bins
   breaks = pretty(range(KCV$residual), n = nclass.Sturges(KCV$residual), min.n = 1)
@@ -58,9 +121,9 @@ create_report = function(Create_report = FALSE, Open_report = FALSE)
   txt_kriging = fpar("",run_linebreak())
   txt_variance = fpar("",run_linebreak())
 
-  mdf_model = as.character(MDF$model)
+  mdf_model = as.character(VAR_DF$model)
 
-  if(length(MDF$model) > 1)
+  if(length(VAR_DF$model) > 1)
   {
     model_fit = model_type[mdf_model[2]]
   } else {
@@ -94,7 +157,7 @@ create_report = function(Create_report = FALSE, Open_report = FALSE)
     body_add_par(value = "Stats", style = "heading 1") |>
     body_add_par(value = run_linebreak(), style = "Normal") |>
     body_add_caption(value = block_caption(cap_table_model, style = "Normal", autonum = run_num_table)) |>
-    body_add_table(MDF, style = "Table Professional") |>
+    body_add_table(VAR_DF, style = "Table Professional") |>
     body_add_par(value = run_linebreak(), style = "Normal") |>
     body_add_caption(value = block_caption(cap_table_stat, style = "Normal", autonum = run_num_table)) |>
     body_add_table(STAT, style = "Table Professional") |>
@@ -142,5 +205,7 @@ create_report = function(Create_report = FALSE, Open_report = FALSE)
     body_add(value = capture.output(sessionInfo()), style = "Normal")
 
   print(doc, target = Report)
-  if(Open_report) browseURL(Report)
+  if(or) browseURL(Report)
+
+  return(list(p1=p1, p2=p2, p3=p3, p4=p4))
 }
