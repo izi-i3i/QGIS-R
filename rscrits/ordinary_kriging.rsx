@@ -82,7 +82,7 @@
 tictoc::tic()
 
 # READ PACKAGES ====================================
-packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel",
+packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel",, "palettes","paletteer",
              "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
