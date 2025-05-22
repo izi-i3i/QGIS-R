@@ -28,7 +28,9 @@
 #' Psill: Initial value for partial sill
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
-#' Color_report: Select color palette: Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
+#' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
+#' N_colors: Number of color ramp.
+#' Invert_Color_Ramp: Invert color ramp.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
 #' Report: Directory and name of the report (docx) to be saved.
@@ -40,7 +42,8 @@
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
-##Layer=vector
+
+##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
 
 ##Field=Field Layer
@@ -70,9 +73,11 @@
 
 ##Create_report=boolean True
 ##Open_report=boolean False
+##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
+##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|100
+##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
-##Color_report=enum literal Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Report=output file docx
 
 ##OK_variance=output raster
@@ -82,7 +87,7 @@
 tictoc::tic()
 
 # READ PACKAGES ====================================
-packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel",, "palettes","paletteer",
+packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
              "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
@@ -118,9 +123,23 @@ fun = c("get_grid.R", "plot_variogram.R", "create_report.R")
 sourceFun(fun, trace=T)
 cat(" ----------------------------------\n")
 
-# =========================================================================
+# SEED ====================================================================
 if(Set_Seed) set.seed(Seed)
-Color_report = tolower(Color_report)
+
+# COLOR ===================================================================
+dct = if(Invert_Color_Ramp) -1 else 1
+Colors = list(
+     "Spectral" = paletteer::paletteer_c("grDevices::Spectral", N_colors, direction = dct),
+     "Turbo" = paletteer::paletteer_c("viridis::turbo", N_colors, direction = dct),
+     "Magma" = paletteer::paletteer_c("viridis::magma", N_colors, direction = dct),
+     "Inferno" = paletteer::paletteer_c("viridis::inferno", N_colors, direction = dct),
+     "Plasma" = paletteer::paletteer_c("viridis::plasma", N_colors, direction = dct),
+     "Viridis" = paletteer::paletteer_c("viridis::viridis", N_colors, direction = dct),
+     "Cividis" = paletteer::paletteer_c("viridis::cividis", N_colors, direction = dct),
+     "Rocket" = paletteer::paletteer_c("viridis::rocket", N_colors, direction = dct),
+     "Mako" = paletteer::paletteer_c("viridis::mako", N_colors, direction = dct)
+     )
+Color_report = as.character(Colors[[Color_report]])
 
 # LAYER TRANSFORM =================================
 Layer = st_transform(Layer, crs = CRS_Layer)

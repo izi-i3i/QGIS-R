@@ -30,7 +30,9 @@
 #' Psill: Initial value for partial sill
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
-#' Color_report: Select color palette: Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
+#' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
+#' N_colors: Number of color ramp.
+#' Invert_Color_Ramp: Invert color ramp.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
 #' Report: Directory and name of the report (docx) to be saved.
@@ -43,20 +45,20 @@
 ##Universal Kriging=name
 ##[R-Geostatistics]=group
 
-##Layer=vector
-##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
+##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3395
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle;Convex hull ;
 
+#QgsProcessingParameterNumber|Block_size|Block size|QgsProcessingParameterNumber.Integer|40
 ##Block_size=string "40, 40"
 
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
-
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
@@ -66,6 +68,7 @@
 ##Local_kriging=boolean False
 ##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
 
+#QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
 ##Resolution=string "auto"
 
 ##Set_Seed=boolean True
@@ -74,9 +77,11 @@
 
 ##Create_report=boolean True
 ##Open_report=boolean False
+##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
+##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|100
+##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
-###Color_report=enum literal Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Report=output file docx
 
 ##UK_variance=output raster
@@ -87,7 +92,7 @@
 tictoc::tic()
 
 # READ PACKAGES ====================================
-packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel",
+packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
              "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
@@ -123,9 +128,23 @@ fun = c("get_grid.R", "plot_variogram.R", "create_report.R")
 sourceFun(fun, trace=T)
 cat(" ----------------------------------\n")
 
-# =========================================================================
+# SEED ====================================================================
 if(Set_Seed) set.seed(Seed)
-Color_report = tolower(Color_report)
+
+# COLOR ===================================================================
+dct = if(Invert_Color_Ramp) -1 else 1
+Colors = list(
+     "Spectral" = paletteer::paletteer_c("grDevices::Spectral", N_colors, direction = dct),
+     "Turbo" = paletteer::paletteer_c("viridis::turbo", N_colors, direction = dct),
+     "Magma" = paletteer::paletteer_c("viridis::magma", N_colors, direction = dct),
+     "Inferno" = paletteer::paletteer_c("viridis::inferno", N_colors, direction = dct),
+     "Plasma" = paletteer::paletteer_c("viridis::plasma", N_colors, direction = dct),
+     "Viridis" = paletteer::paletteer_c("viridis::viridis", N_colors, direction = dct),
+     "Cividis" = paletteer::paletteer_c("viridis::cividis", N_colors, direction = dct),
+     "Rocket" = paletteer::paletteer_c("viridis::rocket", N_colors, direction = dct),
+     "Mako" = paletteer::paletteer_c("viridis::mako", N_colors, direction = dct)
+     )
+Color_report = as.character(Colors[[Color_report]])
 
 # LAYER TRANSFORM =================================
 Layer = st_transform(Layer, crs = CRS_Layer)
@@ -233,16 +252,16 @@ GRIDE = get_grid(layer = LAYER, resolution = Resolution,
                  fx = Expand_longitude, fy = Expand_latitude)
 
 # KRIGING ==============================================
-kpred = predict(g, newdata = GRIDE)
+#kpred = predict(g, newdata = GRIDE)
 
 Block_size = unlist(strsplit(Block_size, ","))
 Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})
 
 if(Local_kriging)
 {
-  UK = krige(frm, locations=LAYER, newdata = kpred, var_model, nmax = Nearest_observations, block = c(Block_size,Block_size))
+  UK = krige(frm, locations=LAYER, newdata = GRIDE, var_model, nmax = Nearest_observations, block = Block_size)
 } else {
-  UK = krige(frm, locations=LAYER, newdata = kpred, var_model, block = c(Block_size,Block_size))
+  UK = krige(frm, locations=LAYER, newdata = GRIDE, var_model, block = Block_size)
 }
 
 # RASTER ==================================================================
