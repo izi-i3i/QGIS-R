@@ -220,7 +220,7 @@ if(ln > 15 | sum(pn) > 0)
 }
 
 # VARIOGRAM ========================================
-f = c('Field~1', 'Field~x+y', 'Field~dist')[2]
+f =  'Field~x+y'
 frm = formula(f)
 g = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(g)
