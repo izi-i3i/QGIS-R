@@ -93,7 +93,7 @@ tictoc::tic()
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
-             "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
+             "tictoc", "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
