@@ -22,9 +22,11 @@ create_report = function(cr = TRUE, or = FALSE)
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
   LAYER_DF = as.data.frame(LAYER)
 
+  pr = str2lang(names(PRED_RASTER_DF)[3])
+
   p2 = ggplot() +
     theme_bw() +
-    geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
+    geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = eval(pr))) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
 #     scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
     scale_fill_palette_c(Color_report) +
@@ -35,16 +37,17 @@ create_report = function(cr = TRUE, or = FALSE)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
 
   # PLOT VARIOGRAM ========================================
   VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
 
+  vr = str2lang(names(VAR_RASTER_DF)[3])
+
   p3 = ggplot() +
     theme_bw() +
-    geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
+    geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = eval(vr))) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-#     scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
@@ -53,7 +56,7 @@ create_report = function(cr = TRUE, or = FALSE)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt)
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill=Field)
 
   # CLOUD VARIOGRAM =========================================================
   # variogram calculation, cloud=TRUE is for cloud scatter 
@@ -98,7 +101,6 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw(12) +
     geom_point(aes(fill = residual, size = residual), alpha=.5, shape=21) +
     scale_size_area(max_size = 8) +
-#     scale_fill_viridis(option = Color_report) +
     scale_fill_palette_c(Color_report) +
     guides(fill = guide_legend(), size = guide_legend()) +
     theme(plot.title = element_text(size = 12),
