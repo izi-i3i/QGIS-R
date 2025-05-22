@@ -8,7 +8,6 @@ create_report = function(cr = TRUE, or = FALSE)
 {
   if(!cr) return(NULL)
 
-
   # PLOT VARIOGRAM ========================================
   pv1 = plot_variogram(vg, var_model, Model)
   pv2 = ggplot() +
@@ -16,7 +15,6 @@ create_report = function(cr = TRUE, or = FALSE)
     annotate(geom='table', x=1, y=1, label=list(VAR_DF), size=4)
   p1 = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(6, 1) ) +
     theme(plot.background = element_rect(fill = "white", colour = NA))
-
 
   # PLOT KRIGING =========================================
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
@@ -28,7 +26,6 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw() +
     geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = eval(pr))) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-#     scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
