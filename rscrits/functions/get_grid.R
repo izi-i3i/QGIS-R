@@ -5,6 +5,15 @@
 ## License :
 ## Updated :
 ##-------------------------------------------
+if(F)
+{
+layer=LAYER
+resolution=100
+grid.method = c('Rectangle','Convex hull')[2]
+expand = TRUE
+fx = 0.01
+fy = 0.01
+}
 get_grid = function (layer,
                      resolution,
                      grid.method = c('Rectangle','Convex hull'),
@@ -51,6 +60,17 @@ get_grid = function (layer,
   attr(gride@coords, "dimnames")[[2]] <- c("x", "y")
   attr(gride@bbox, "dimnames")[[1]] <- c("x", "y")
   gridded(gride) = T
+
+#   gride = makegrid(d, n = 1, cellsize=c(resolution,resolution))
+#   names(gride) <- c("x","y")
+#   gridded(gride) = ~x+y
   attr(gride, "proj4string") = layer@proj4string
   return(gride)
+}
+
+if(F)
+{
+str(gride)
+gridparameters(gride)
+head(gride)
 }

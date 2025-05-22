@@ -26,7 +26,8 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw() +
     geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+#     scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+    scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
     coord_fixed(expand = TRUE, clip = "off") +
@@ -43,7 +44,8 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw() +
     geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
-    scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+#     scale_fill_viridis(option = Color_report, name=Field, na.value="transparent") +
+    scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
     coord_fixed(expand = TRUE, clip = "off") +
@@ -63,7 +65,6 @@ create_report = function(cr = TRUE, or = FALSE)
     scale_x_continuous(expand = expansion(mult=0.03)) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
-          #           axis.text.y = element_text(angle = 90, hjust = 0.5),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
@@ -97,7 +98,8 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw(12) +
     geom_point(aes(fill = residual, size = residual), alpha=.5, shape=21) +
     scale_size_area(max_size = 8) +
-    scale_fill_viridis(option = Color_report) +
+#     scale_fill_viridis(option = Color_report) +
+    scale_fill_palette_c(Color_report) +
     guides(fill = guide_legend(), size = guide_legend()) +
     theme(plot.title = element_text(size = 12),
           legend.title = element_blank(),
@@ -207,5 +209,12 @@ create_report = function(cr = TRUE, or = FALSE)
   print(doc, target = Report)
   if(or) browseURL(Report)
 
-  return(list(p1=p1, p2=p2, p3=p3, p4=p4))
+  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4)))
+}
+
+if(F)
+{
+  create_report(cr=T, or=F)
+  rp = create_report(cr=T, or=F)
+  rp[['p1']]
 }

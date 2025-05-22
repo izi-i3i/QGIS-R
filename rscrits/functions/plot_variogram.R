@@ -51,7 +51,8 @@ plot_variogram = function(vg, fit.vgm, model = NULL) {
     geom_text_repel(aes(label = np)) +
     scale_y_continuous(limits = c(0, NA)) +
     scale_size_binned(range = c(1, 10), breaks = breaks, name = "n point pairs") +
-    scale_fill_viridis(option = Color_report) +
+#     scale_fill_viridis(option = Color_report) +
+    scale_fill_palette_c(Color_report) +
     guides(fill = guide_legend(order=0), size = guide_legend(order=0), color = guide_legend()) +
     labs(x = "distance", y = "semivariance", fill = "n point pairs", color = "")
 
