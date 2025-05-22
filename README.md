@@ -12,4 +12,3 @@ You can find the R scripts for spatial modelling in the `rscripts` folder.
 
 * [Processing R Provider](https://north-road.github.io/qgis-processing-r/)
 
-may/2025
