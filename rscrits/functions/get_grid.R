@@ -5,15 +5,6 @@
 ## License :
 ## Updated :
 ##-------------------------------------------
-if(F)
-{
-layer=LAYER
-resolution=100
-grid.method = c('Rectangle','Convex hull')[2]
-expand = TRUE
-fx = 0.01
-fy = 0.01
-}
 get_grid = function (layer,
                      resolution,
                      grid.method = c('Rectangle','Convex hull'),
@@ -68,9 +59,3 @@ get_grid = function (layer,
   return(gride)
 }
 
-if(F)
-{
-str(gride)
-gridparameters(gride)
-head(gride)
-}

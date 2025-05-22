@@ -212,9 +212,3 @@ create_report = function(cr = TRUE, or = FALSE)
   return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4)))
 }
 
-if(F)
-{
-  create_report(cr=T, or=F)
-  rp = create_report(cr=T, or=F)
-  rp[['p1']]
-}
