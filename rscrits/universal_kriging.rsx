@@ -30,36 +30,40 @@
 #' Psill: Initial value for partial sill
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
+#' Set_Seed: Ensures that the same random values are produced every time you run the code. 
+#'         : In blank the number generation is random.
 #' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
 #' N_colors: Number of color ramp.
 #' Invert_Color_Ramp: Invert color ramp.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
 #' Report: Directory and name of the report (docx) to be saved.
+#' rscripts_folder: path to rscript folder.
 #' UK_variance: Kriging variance of prediction (raster)
 #' UK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.1
+#' ALG_VERSION: 0.0.2
 
 ##Universal Kriging=name
 ##[R-Geostatistics]=group
 
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
-##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3395
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle;Convex hull ;
 
-#QgsProcessingParameterNumber|Block_size|Block size|QgsProcessingParameterNumber.Integer|40
-##Block_size=string "40, 40"
+##Block_size=string "0, 0"
 
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
+
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
+
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
@@ -68,21 +72,23 @@
 ##Local_kriging=boolean False
 ##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
 
-#QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
 ##Resolution=string "auto"
+#
+###Set_Seed=string "1234"
 
 ##Set_Seed=boolean True
 ##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
 
-
 ##Create_report=boolean True
 ##Open_report=boolean False
 ##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
-##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|100
+#QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|10
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
+
+##QgsProcessingParameterFile|rscripts_folder|rscripts path|1||~/.local/share/QGIS/QGIS3|True
 
 ##UK_variance=output raster
 ##UK_prediction=output raster
@@ -93,7 +99,7 @@ tictoc::tic()
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
-             "tictoc", "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
+             "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
@@ -102,36 +108,72 @@ for (pac in packages) {
   }
 }
 
-# READ FUNCTIONS ==========================================================
-sourceFun = function(fun, trace = FALSE, ...)
+# DIR QGIS3 ===============================================================
+file_path = file.path(getwd(), ".rscript_path")
+
+if (!file.exists(file_path))
 {
   os <- .Platform$OS.type
   if(os == "unix"){
-    dir_fl = "~/.local/share/QGIS/QGIS3"
+    dir_path = "~/.local/share/QGIS/QGIS3"
   } else if(os == "windows"){
-    dir_fl = "~\\AppData\\Roaming\\QGIS\\QGIS3"
+    dir_path = "AppData\\Roaming\\QGIS\\QGIS3"
   } else if(os == "osx"){
-    dir_fl = "~/Library/Application\\ Support/QGIS/QGIS3"
+    dir_path = "~/Library/Application\\ Support/QGIS/QGIS3"
   }
 
-  fl = list.files(dir_fl, recursive = T, full.names = T)
-  arq = grep(paste0(fun, collapse="|"), fl, value = T)
+  fileConn<-file(".rscript_path")
+  writeLines(dir_path, fileConn)
+  close(fileConn)
+}
+
+if (file.exists(file_path) & rscripts_folder != "")
+{ # file=EXISTS; folder=NON-EMPTY
+  dir_path <- rscripts_folder
+  dir_path_aux <- readLines(file_path)
+  if (dir_path != dir_path_aux)
+  {
+    fileConn<-file(".rscript_path")
+    writeLines(dir_path, fileConn)
+    close(fileConn)
+  }
+} else {# file=EXISTS; folder=EMPTY
+  dir_path_aux = rscripts_folder
+  dir_path = readLines(file_path)
+}
+
+if(!dir.exists(dir_path)) stop("directory does not exist", call. = FALSE)
+
+# READ FUNCTIONS ==========================================================
+sourceFun = function(x, path, trace = FALSE, ...)
+{
+  list_file = list.files(path, recursive = TRUE, full.names = TRUE)
+  arq = grep(paste0(x, collapse="|"), list_file, value = TRUE)
   for (i in 1:length(arq)) {
     if(trace) cat(i,":", arq[i], "\n", sep="")
-    source(arq[i], ...)
+    source(arq[i])
   }#end for
 }
 
 cat("\n ----------------------------------\n")
 cat("Loading required functions:\n")
-fun = c("get_grid.R", "plot_variogram.R", "create_report.R")
-sourceFun(fun, trace=T)
+fun = c("get_grid.R",
+        "plot_variogram.R",
+        "create_report.R",
+        "change_dir.R",
+        "find_file.R")
+sourceFun(fun, path = dir_path, trace=TRUE)
 cat(" ----------------------------------\n")
 
+# CHANGE DIR ==============================================================
+change_dir("universal_kriging.rsx", dir_path, dir_path_aux)
+
 # SEED ====================================================================
-if(Set_Seed) set.seed(Seed)
+if(Set_Seed == "") Set_Seed = NULL
+set.seed(Set_Seed)
 
 # COLOR ===================================================================
+N_colors = 100
 dct = if(Invert_Color_Ramp) -1 else 1
 Colors = list(
      "Spectral" = paletteer::paletteer_c("grDevices::Spectral", N_colors, direction = dct),
@@ -154,9 +196,9 @@ Layer = st_transform(Layer, crs = CRS_Layer)
 options(scipen = 9999)
 # extract crs
 crs_info = st_crs(Layer)
-crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
+# crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
 crs_num = crs_info$epsg
-epsg_crs_txt = paste0("EPSG: ", crs_num, " CRS: ", st_crs(st_sfc(crs = crs_num))$Name)
+epsg_crs_txt = paste0("CRS -", " EPSG:", crs_num, " - ", st_crs(st_sfc(crs = crs_num))$Name)
 
 # CRS ==============================================
 ex = data.frame(x=Extent[1:2], y=Extent[3:4])
@@ -220,30 +262,59 @@ if(ln > 15 | sum(pn) > 0)
 }
 
 # VARIOGRAM ========================================
-f =  'Field~x+y'
+f = 'Field~x+y'
 frm = formula(f)
-g = gstat(id = Field, formula = frm, data = LAYER)
-vg = variogram(g)
+gs = gstat(id = Field, formula = frm, data = LAYER)
+vg = variogram(gs)
 
-fit_var = autofitVariogram(frm,
-                          LAYER,
-                          model = model,
-                          kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10), 
-                          fix.values = c(NA,NA,NA),
-                          verbose = F,
-                          GLS.model = NA,
-                          start_vals = c(NA,NA,NA),
-                          miscFitOptions = list())
+if(Estimate_Range_and_Psill)
+{
+  fit_var = autofitVariogram(frm,
+                             LAYER,
+                             model = model,
+                             kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10),
+                             fix.values = c(NA,NA,NA),
+                             verbose = F,
+                             GLS.model = NA,
+                             start_vals = c(NA,NA,NA),
+                             miscFitOptions = list())
 
-var_model = fit_var$var_model
-exp_var = fit_var$exp_var
-var_sserr = fit_var$sserr
+  var_model = fit_var$var_model
+  vg = fit_var$exp_var
+  var_sserr = fit_var$sserr
+
+} else {
+  if(any(model %in% "Pow"))
+  {
+    if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
+    vgm_ = vgm(nugget = 0, psill = Psill, range = Range, model = model)
+    var_model = fit.variogram(vg, model = vgm_, fit.kappa = F)
+
+  } else if(any(model %in% "Nug")) {
+
+    if(Estimate_Range_and_Psill){ Range = NA; Psill = NA }
+    vgm_ = vgm(psill = Psill, range = Range, model = model)
+    var_model = fit.variogram(object=vg, model=vgm_)
+
+  } else {
+
+    if(Estimate_Range_and_Psill) {
+      Psill = max(vg$gamma)*0.9
+      Range = max(vg$dist)/2
+      Nugget = mean(vg$gamma)/4
+    }
+    vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
+    var_model = fit.variogram(vg, model = vgm_, fit.kappa = T)
+  }
+  var_sserr = attr(var_model, "SSErr")
+}
+
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
 
 # AUTOMATIC RESOLUTION ====================================================
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/100)
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/150)
     })
 
 # GRID =================================================
@@ -251,25 +322,61 @@ GRIDE = get_grid(layer = LAYER, resolution = Resolution,
                  grid.method = Grid_method, expand = Expand_vector,
                  fx = Expand_longitude, fy = Expand_latitude)
 
-# KRIGING ==============================================
-#kpred = predict(g, newdata = GRIDE)
-
+# UNIVERSAL KRIGING ====================================
 Block_size = unlist(strsplit(Block_size, ","))
-Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})
+Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
+
+kpred = predict(gs, newdata = GRIDE, block = Block_size)
 
 if(Local_kriging)
 {
-  UK = krige(frm, locations=LAYER, newdata = GRIDE, var_model, nmax = Nearest_observations, block = Block_size)
+  UK = krige(id = Field, frm, locations = LAYER, newdata = kpred, model = var_model,
+             nmax = Nearest_observations, block = Block_size)
 } else {
-  UK = krige(frm, locations=LAYER, newdata = GRIDE, var_model, block = Block_size)
+  UK = krige(id=Field, gs,formula = frm, locations=LAYER, newdata = kpred, model = var_model, block = Block_size)
 }
 
 # RASTER ==================================================================
-PRED_RASTER = raster(UK["var1.pred"])
-VAR_RASTER = raster(UK["var1.var"])
+PRED_RASTER = raster(UK[1])
+VAR_RASTER = raster(UK[2])
 
 # CROSS VALIDATION =====================================
-KCV = krige.cv(frm, LAYER, var_model, nmax = 25, nfold = 5, verbose = FALSE)
+
+# round data.frame
+round_df <- function(x, dig)
+{
+    numeric_columns <- sapply(x, class) == 'numeric'
+    x[numeric_columns] <-  round(x[numeric_columns], dig)
+    x
+}
+# get cross validation statistics
+get_stats <- function(x, method)
+{
+  sserr = attr(var_model, "SSErr")
+  mean_err <- mean(x$residual)
+  mspe <- mean(x$residual^2)
+  msne <- mean(x$zscore^2)
+  pred = x$observed - x$residual
+  cor_obs_pred <- cor(x$observed, pred)
+  cor_pred_resid <- cor(pred, x$residual)
+  rmse <- sqrt(sum(x$residual^2)/length(x$residual))
+
+  Stat = c("Sum of Squares Error (SSE)",
+           "Mean error residual",
+           "Mean Square Prediction Error (MSPE)",
+           "Mean square normalized error",
+           "Correlation observed and predicted",
+           "Correlation predicted and residual",
+           "Root Mean Square Error (RMSE)")
+  Observed = c(sserr, mean_err, mspe, msne, cor_obs_pred, cor_pred_resid, rmse)
+  Ideally = c(0, 0, "small", "close to 1", 1, 0, "small")
+  dfe = data.frame(Stat, Observed, Ideally)
+# dfe = data.frame(method = method, sserr, mean_err, mspe, msne, cor_obs_pred, cor_pred_resid, rmse)
+  dfe
+}
+
+KCV = krige.cv(frm, LAYER, var_model, nmax = Nearest_observations, nfold = Nearest_observations, verbose = FALSE)
+
 KCV_DF = as.data.frame(KCV)
 # sserr = attr(var_model, "SSErr")
 # Mean error, ideally 0:
@@ -291,12 +398,13 @@ STAT = data.frame(Stat = c("Sum of Squares Error (SSE)",
                            "Correlation predicted and residual"),
                   Observed = c(var_sserr, mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red),
                   Ideally = c(0, 0, "small", "close to 1", 1, 0))
+STAT = round_df(STAT, 4)
 
 # PRINT ===============================================
 printInfo <- function()
 {
   cat("Model:","\n")
-  print(VAR_DF, row.names = T,right = T)
+  print(VAR_DF, row.names = TRUE,right = TRUE)
   cat("\nResolution:", Resolution,"meter\n")
   cat("\nStatistical:\n")
   cat("SSE:", attr(var_model, "SSErr"),"\n")
@@ -308,12 +416,40 @@ printInfo <- function()
 }
 printInfo()
 
-# REPORT ==============================================
-rp = create_report(Create_report, Open_report)
-
 # OUT =================================================
 UK_variance = VAR_RASTER
 UK_prediction = PRED_RASTER
+
+if(F)
+{
+source("/mnt/Arquivo/R/sources/functions/summary_dt.R")
+
+DF = as.data.frame(UK_prediction)
+head(DF)
+names(DF) <- "Field"
+summary_dt(DF, 'Field', language = "en")[[2]]
+
+ukp = slot(UK_prediction@data, 'values')
+mean(ukp)
+
+head(as.data.frame(UK_prediction))
+st = rownames(summary(UK_prediction))
+uk.pred=summary(UK_prediction)
+
+uk.var=summary(UK_variance)
+SM = data.frame(st, uk.pred, uk.var)
+names(SM)<-c("Stat", "uk.pred", "uk.var")
+SM
+
+Layer
+LAYER$Field
+log(Layer$zinc)
+summary(LAYER$Field)
+}
+
+# REPORT ==============================================
+rp = create_report(Create_report, Open_report)
+
 
 # ======================================================
 nome_doc = paste("kriging on the field vector:", Field)
@@ -325,3 +461,4 @@ msg_toc = function(tic,toc,msg,arq){
         "----------------------------------\n")
 }
 tictoc::toc(func.toc = msg_toc, arq=nome_doc)
+

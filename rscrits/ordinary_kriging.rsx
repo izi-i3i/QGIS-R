@@ -1,3 +1,4 @@
+
 #' ALG_DESC: <p>This file creates a <span style='text-decoration: underline;'>Ordinary Kriging</span>.
 #'         : This script does Ordinary Kriging interpolation from a numeric field of a points vector layer.
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
@@ -28,17 +29,20 @@
 #' Psill: Initial value for partial sill
 #' Range: Initial value for range
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
+#' Set_Seed: Ensures that the same random values are produced every time you run the code
+#'         : In blank the number generation is random.
 #' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
 #' N_colors: Number of color ramp.
 #' Invert_Color_Ramp: Invert color ramp.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
+#' rscripts_folder: path to rscript folder.
 #' Report: Directory and name of the report (docx) to be saved.
 #' OK_variance: Kriging variance of prediction (raster)
 #' OK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.6
+#' ALG_VERSION: 0.0.7
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
@@ -68,27 +72,29 @@
 #QgsProcessingParameterNumber|Resolution|Resolution (meter)|QgsProcessingParameterNumber.Integer|0
 ##Resolution=string "auto"
 
-##Set_Seed=boolean True
-##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
+##Set_Seed=string "1234"
 
 ##Create_report=boolean True
 ##Open_report=boolean False
 ##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
-##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|100
+##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|10
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
 
+##QgsProcessingParameterFile|rscripts_folder|rscripts path|1||~/.local/share/QGIS/QGIS3/profiles|True
+
 ##OK_variance=output raster
 ##OK_prediction=output raster
+
 
 # PROCESSING TIME =================================
 tictoc::tic()
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
-             "tictoc", "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
+             "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
@@ -97,36 +103,73 @@ for (pac in packages) {
   }
 }
 
-# READ FUNCTIONS ==========================================================
-sourceFun = function(fun, trace = FALSE, ...)
+
+# DIR QGIS3 ===============================================================
+file_path = file.path(getwd(), ".rscript_path")
+
+if (!file.exists(file_path))
 {
   os <- .Platform$OS.type
   if(os == "unix"){
-    dir_fl = "~/.local/share/QGIS/QGIS3"
+    dir_path = "~/.local/share/QGIS/QGIS3"
   } else if(os == "windows"){
-    dir_fl = "~\\AppData\\Roaming\\QGIS\\QGIS3"
+    dir_path = "AppData\\Roaming\\QGIS\\QGIS3"
   } else if(os == "osx"){
-    dir_fl = "~/Library/Application\\ Support/QGIS/QGIS3"
+    dir_path = "~/Library/Application\\ Support/QGIS/QGIS3"
   }
 
-  fl = list.files(dir_fl, recursive = T, full.names = T)
-  arq = grep(paste0(fun, collapse="|"), fl, value = T)
+  fileConn<-file(".rscript_path")
+  writeLines(dir_path, fileConn)
+  close(fileConn)
+}
+
+if (file.exists(file_path) & rscripts_folder != "")
+{ # file=EXISTS; folder=NON-EMPTY
+  dir_path <- rscripts_folder
+  dir_path_aux <- readLines(file_path)
+  if (dir_path != dir_path_aux)
+  {
+    fileConn<-file(".rscript_path")
+    writeLines(dir_path, fileConn)
+    close(fileConn)
+  }
+} else {# file=EXISTS; folder=EMPTY
+  dir_path_aux = rscripts_folder
+  dir_path = readLines(file_path)
+}
+
+if(!dir.exists(dir_path)) stop("directory does not exist", call. = FALSE)
+
+# READ FUNCTIONS ==========================================================
+sourceFun = function(x, path, trace = FALSE, ...)
+{
+  list_file = list.files(path, recursive = TRUE, full.names = TRUE)
+  arq = grep(paste0(x, collapse="|"), list_file, value = TRUE)
   for (i in 1:length(arq)) {
     if(trace) cat(i,":", arq[i], "\n", sep="")
-    source(arq[i], ...)
+    source(arq[i])
   }#end for
 }
 
 cat("\n ----------------------------------\n")
 cat("Loading required functions:\n")
-fun = c("get_grid.R", "plot_variogram.R", "create_report.R")
-sourceFun(fun, trace=T)
+fun = c("get_grid.R",
+        "plot_variogram.R",
+        "create_report.R",
+        "change_dir.R",
+        "find_file.R")
+sourceFun(fun, path = dir_path, trace=TRUE)
 cat(" ----------------------------------\n")
 
+# CHANGE DIR ==============================================================
+change_dir("ordinary_kriging.rsx", dir_path, dir_path_aux)
+
 # SEED ====================================================================
-if(Set_Seed) set.seed(Seed)
+if(Set_Seed == "") Set_Seed = NULL
+set.seed(Set_Seed)
 
 # COLOR ===================================================================
+N_colors = 100
 dct = if(Invert_Color_Ramp) -1 else 1
 Colors = list(
      "Spectral" = paletteer::paletteer_c("grDevices::Spectral", N_colors, direction = dct),
@@ -149,7 +192,7 @@ Layer = st_transform(Layer, crs = CRS_Layer)
 options(scipen = 9999)
 # extract crs
 crs_info = st_crs(Layer)
-crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
+# crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
 crs_num = crs_info$epsg
 epsg_crs_txt = paste0("EPSG: ", crs_num, " CRS: ", st_crs(st_sfc(crs = crs_num))$Name)
 
@@ -215,12 +258,14 @@ if(ln > 15 | sum(pn) > 0)
 }
 
 # VARIOGRAM ========================================
-f =  'Field~1'
+f = 'Field~1'
 frm = formula(f)
 g = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(g)
 
-fit_var = autofitVariogram(frm,
+if(Estimate_Range_and_Psill)
+{
+  fit_var = autofitVariogram(frm,
                              LAYER,
                              model = model,
                              kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10), 
@@ -230,15 +275,43 @@ fit_var = autofitVariogram(frm,
                              start_vals = c(NA,NA,NA),
                              miscFitOptions = list())
 
-var_model = fit_var$var_model
-exp_var = fit_var$exp_var
-var_sserr = fit_var$sserr
+  var_model = fit_var$var_model
+  vg = fit_var$exp_var
+  var_sserr = fit_var$sserr
+
+} else {
+  if(any(model %in% "Pow"))
+  {
+    if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
+    vgm_ = vgm(nugget = 0, psill = Psill, range = Range, model = model)
+    var_model = fit.variogram(vg, model = vgm_, fit.kappa = F)
+
+  } else if(any(model %in% "Nug")) {
+
+    if(Estimate_Range_and_Psill){ Range = NA; Psill = NA }
+    vgm_ = vgm(psill = Psill, range = Range, model = model)
+    var_model = fit.variogram(object=vg, model=vgm_)
+
+  } else {
+
+    if(Estimate_Range_and_Psill) {
+      Psill = max(vg$gamma)*0.9
+      Range = max(vg$dist)/2
+      Nugget = mean(vg$gamma)/4
+    }
+    vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
+    #   vgm_ = vgm(nugget = NA, psill = NA, range = NA, model = model)
+
+    var_model = fit.variogram(vg, model = vgm_, fit.kappa = T)
+  }
+  var_sserr = attr(var_model, "SSErr")
+}
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
 
 # AUTOMATIC RESOLUTION ====================================================
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-     round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/400)
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
     })
 
 # GRID =================================================
@@ -251,10 +324,11 @@ kpred = predict(g, newdata = GRIDE)
 
 if(Local_kriging)
 {
-  OK = krige(frm, LAYER, newdata = kpred, var_model, nmax = Nearest_observations)
+  OK = krige(frm, LAYER, newdata = kpred, model = var_model, nmax = Nearest_observations)
 } else {
-  OK = krige(frm, LAYER, newdata = kpred, var_model)
+  OK = krige(frm, LAYER, newdata = kpred, model = var_model)
 }
+
 
 # RASTER ==================================================================
 PRED_RASTER = raster(OK["var1.pred"])
@@ -288,7 +362,7 @@ STAT = data.frame(Stat = c("Sum of Squares Error (SSE)",
 printInfo <- function()
 {
   cat("Model:","\n")
-  print(VAR_DF, row.names = T,right = T)
+  print(VAR_DF, row.names = TRUE,right = TRUE)
   cat("\nResolution:", Resolution,"meter\n")
   cat("\nStatistical:\n")
   cat("SSE:", attr(var_model, "SSErr"),"\n")
@@ -317,3 +391,4 @@ msg_toc = function(tic,toc,msg,arq){
         "----------------------------------\n")
 }
 tictoc::toc(func.toc = msg_toc, arq=nome_doc)
+

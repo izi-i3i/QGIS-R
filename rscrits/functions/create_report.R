@@ -25,7 +25,7 @@ create_report = function(cr = TRUE, or = FALSE)
   p2 = ggplot() +
     theme_bw() +
     geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = eval(pr))) +
-    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
+    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
@@ -44,7 +44,7 @@ create_report = function(cr = TRUE, or = FALSE)
   p3 = ggplot() +
     theme_bw() +
     geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = eval(vr))) +
-    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=20)), list(NULL)) +
+    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
@@ -53,7 +53,7 @@ create_report = function(cr = TRUE, or = FALSE)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill=Field)
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
 
   # CLOUD VARIOGRAM =========================================================
   # variogram calculation, cloud=TRUE is for cloud scatter 
@@ -178,7 +178,7 @@ create_report = function(cr = TRUE, or = FALSE)
     body_add_caption(value = block_caption(cap_fig_p1, style = "Normal", autonum = run_num)) |>
     body_add_par(value = run_linebreak(), style = "Normal") |>
     body_add_caption(value = block_caption(cap_table_exp_var, style = "Normal", autonum = run_num_table)) |>
-    body_add_table(exp_var, style = "Table Professional") |>
+    body_add_table(vg, style = "Table Professional") |>
     body_add_par(value = run_linebreak(), style = "Normal") |>
     body_add_gg(value = p4, width = 6.3, height = 6.4, scale= .8, res=150) |>
     body_add_caption(value = block_caption( cap_fig_p4, style = "Normal", autonum = run_num)) |>
@@ -208,6 +208,6 @@ create_report = function(cr = TRUE, or = FALSE)
   print(doc, target = Report)
   if(or) browseURL(Report)
 
-  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4)))
+  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4, g1=g1)))
 }
 
