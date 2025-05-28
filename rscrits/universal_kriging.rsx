@@ -203,9 +203,9 @@ if (crs_unit != "metre") {
 options(scipen = 9999)
 # extract crs
 crs_info = st_crs(Layer)
-# crs_unit = st_crs(crs_info, parameters = TRUE)$units_gdal
 crs_num = crs_info$epsg
-epsg_crs_txt = paste0("CRS -", " EPSG:", crs_num, " - ", st_crs(st_sfc(crs = crs_num))$Name)
+crs_proj = st_crs(st_sfc(crs = crs_num))
+epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
 
 # CRS ==============================================
 ex = data.frame(x=Extent[1:2], y=Extent[3:4])
@@ -275,7 +275,7 @@ frm = formula(f)
 gs = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(gs)
 
-if(Estimate_Range_and_Psill & FALSE)
+if(Estimate_Range_and_Psill)
 {
   fit_var = autofitVariogram(frm,
                              LAYER,
@@ -290,7 +290,10 @@ if(Estimate_Range_and_Psill & FALSE)
   var_model = fit_var$var_model
   var_sserr = fit_var$sserr
 
-} else {
+}
+
+if(Estimate_Range_and_Psill & FALSE)
+{
   if(any(model %in% "Pow"))
   {
     if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
