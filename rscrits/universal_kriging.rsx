@@ -275,7 +275,7 @@ frm = formula(f)
 gs = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(gs)
 
-if(Estimate_Range_and_Psill)
+if(Estimate_Range_and_Psill & FALSE)
 {
   fit_var = autofitVariogram(frm,
                              LAYER,
@@ -288,7 +288,6 @@ if(Estimate_Range_and_Psill)
                              miscFitOptions = list())
 
   var_model = fit_var$var_model
-  vg = fit_var$exp_var
   var_sserr = fit_var$sserr
 
 } else {
@@ -306,7 +305,8 @@ if(Estimate_Range_and_Psill)
 
   } else {
 
-    if(Estimate_Range_and_Psill) {
+    if(Estimate_Range_and_Psill)
+    {
       Psill = max(vg$gamma)*0.9
       Range = max(vg$dist)/2
       Nugget = mean(vg$gamma)/4

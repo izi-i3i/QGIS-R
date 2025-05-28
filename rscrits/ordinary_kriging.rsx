@@ -271,7 +271,7 @@ frm = formula(f)
 g = gstat(id = Field, formula = frm, data = LAYER)
 vg = variogram(g)
 
-if(Estimate_Range_and_Psill)
+if(Estimate_Range_and_Psill & FALSE)
 {
   fit_var = autofitVariogram(frm,
                              LAYER,
@@ -284,7 +284,6 @@ if(Estimate_Range_and_Psill)
                              miscFitOptions = list())
 
   var_model = fit_var$var_model
-  vg = fit_var$exp_var
   var_sserr = fit_var$sserr
 
 } else {
@@ -302,14 +301,13 @@ if(Estimate_Range_and_Psill)
 
   } else {
 
-    if(Estimate_Range_and_Psill) {
+    if(Estimate_Range_and_Psill)
+    {
       Psill = max(vg$gamma)*0.9
       Range = max(vg$dist)/2
       Nugget = mean(vg$gamma)/4
     }
     vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
-    #   vgm_ = vgm(nugget = NA, psill = NA, range = NA, model = model)
-
     var_model = fit.variogram(vg, model = vgm_, fit.kappa = T)
   }
   var_sserr = attr(var_model, "SSErr")
