@@ -2,8 +2,8 @@
 #'         : This script does Universal Kriging interpolation from a numeric field of a points vector layer.
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
 #'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
-#' Layer: points vector layer.
-#' CRS_Layer: Planar coordinates.
+#' Layer: Points vector layer.
+#' CRS_Layer: Decimal degree coordinate is transformed to planar coordinate.
 #' Field: numeric field from layer to interpolate.
 #' Log_Field: If checked, logarithmize the vector values. Field = log(Field)
 #' Extent: Specifies a numeric variable of length 4 values (xmin, xmax, ymin and ymax).
@@ -22,21 +22,23 @@
 #'      : Periodic (Per), Wave (Wave), Hole (Hol), Logarithmic (Log),
 #'      : Spline (Spl), Power (Pow), Nugget (Nug)
 #'      : in which case the best fitting is returned.
-#' Local_kriging: If checked, points to interpolate will be limited to a number of nearest observations.
-#' Number_of_nearest_observations: Maximun number of observations used in local kriging.
+#' Auto_fit_variogram: Automatically fitting a variogram to the data on which it is applied.
 #' Estimate_Range_and_Psill: If checked, initial values for nugget, psill and range will be
 #'                         : estimated from sample variogram.
 #' Nugget: Iniital value for nugget
-#' Psill: Initial value for partial sill
 #' Range: Initial value for range
+#' Psill: Initial value for partial sill
+#' Local_kriging: If checked, points to interpolate will be limited to a number of nearest observations.
+#' Number_of_nearest_observations: Maximun number of observations used in local kriging.
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
-#' Set_Seed: Ensures that the same random values are produced every time you run the code. 
+#' Set_Seed: Ensures that the same random values are produced every time you run the code
 #'         : In blank the number generation is random.
+#' Create_report: Create report with graphs.
+#' Open_report: Open report.
 #' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
 #' N_colors: Number of color ramp.
 #' Invert_Color_Ramp: Invert color ramp.
-#' Create_report: Create report with graphs.
-#' Open_report: Open report.
+#' Draw_lines_variogram: Draw lines variogram.
 #' Report: Directory and name of the report (docx) to be saved.
 #' rscripts_folder: path to rscript folder.
 #' UK_variance: Kriging variance of prediction (raster)
@@ -45,40 +47,30 @@
 #' ALG_HELP_CREATOR: izi-i3i
 #' ALG_VERSION: 0.0.2
 
+
 ##Universal Kriging=name
 ##[R-Geostatistics]=group
-
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
-##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3857
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle;Convex hull ;
-
 ##Block_size=string "0, 0"
-
 ##Expand_vector=boolean True
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
-
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
-
+##Auto_fit_variogram=boolean True
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
 ##Psill=number 0
-
 ##Local_kriging=boolean False
 ##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
-
 ##Resolution=string "auto"
-#
-###Set_Seed=string "1234"
-
-##Set_Seed=boolean True
-##QgsProcessingParameterNumber|Seed|Number Seed|QgsProcessingParameterNumber.Integer|1234
-
+##Set_Seed=string "1234"
 ##Create_report=boolean True
 ##Open_report=boolean False
 ##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
@@ -87,9 +79,7 @@
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
-
 ##QgsProcessingParameterFile|rscripts_folder|rscripts path|1||~/.local/share/QGIS/QGIS3|True
-
 ##UK_variance=output raster
 ##UK_prediction=output raster
 
@@ -137,7 +127,7 @@ if (file.exists(file_path) & rscripts_folder != "")
     writeLines(dir_path, fileConn)
     close(fileConn)
   }
-} else {# file=EXISTS; folder=EMPTY
+} else { # file=EXISTS; folder=EMPTY
   dir_path_aux = rscripts_folder
   dir_path = readLines(file_path)
 }
@@ -273,27 +263,26 @@ if(ln > 15 | sum(pn) > 0)
 f = 'Field~x+y'
 frm = formula(f)
 gs = gstat(id = Field, formula = frm, data = LAYER)
-vg = variogram(gs)
 
-if(Estimate_Range_and_Psill)
+if(Auto_fit_variogram)
 {
   fit_var = autofitVariogram(frm,
                              LAYER,
                              model = model,
-                             kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10),
+                             kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10), 
                              fix.values = c(NA,NA,NA),
                              verbose = F,
                              GLS.model = NA,
                              start_vals = c(NA,NA,NA),
-                             miscFitOptions = list())
+                             miscFitOptions = list(merge.small.bins = FALSE)
+                             )
 
   var_model = fit_var$var_model
+  vg = fit_var$exp_var
   var_sserr = fit_var$sserr
+} else {
+  vg = variogram(g)
 
-}
-
-if(Estimate_Range_and_Psill & FALSE)
-{
   if(any(model %in% "Pow"))
   {
     if(Estimate_Range_and_Psill){ Range = 1; Psill = NA  }
@@ -310,12 +299,13 @@ if(Estimate_Range_and_Psill & FALSE)
 
     if(Estimate_Range_and_Psill)
     {
-      Psill = max(vg$gamma)*0.9
-      Range = max(vg$dist)/2
-      Nugget = mean(vg$gamma)/4
+      Psill = max(vg$gamma) * 0.9
+      Range = max(vg$dist) / 2
+      Nugget = mean(vg$gamma) / 4
     }
+
     vgm_ = vgm(nugget = Nugget, psill = Psill, range = Range, model = model)
-    var_model = fit.variogram(vg, model = vgm_, fit.kappa = T)
+    var_model = fit.variogram(vg, model = vgm_, fit.kappa = TRUE)
   }
   var_sserr = attr(var_model, "SSErr")
 }
