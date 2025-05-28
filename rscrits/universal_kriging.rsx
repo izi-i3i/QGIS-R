@@ -49,7 +49,7 @@
 ##[R-Geostatistics]=group
 
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
-##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
+##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3857
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
@@ -163,7 +163,7 @@ fun = c("get_grid.R",
         "change_dir.R",
         "find_file.R")
 sourceFun(fun, path = dir_path, trace=TRUE)
-cat(" ----------------------------------\n")
+cat(" ----------------------------------\n\n")
 
 # CHANGE DIR ==============================================================
 change_dir("universal_kriging.rsx", dir_path, dir_path_aux)
@@ -189,7 +189,14 @@ Colors = list(
 Color_report = as.character(Colors[[Color_report]])
 
 # LAYER TRANSFORM =================================
-Layer = st_transform(Layer, crs = CRS_Layer)
+crs_layer = raster::crs(Layer)
+crs_unit = st_crs(crs_layer, parameters = TRUE)$units_gdal
+
+if (crs_unit != "metre") {
+  Layer = st_transform(Layer, crs = CRS_Layer)
+} else{
+  CRS_Layer = crs_layer
+}
 
 # INFO ============================================
 # scientific notation
@@ -209,6 +216,7 @@ Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
 # LAYER ============================================
 LAYER = as_Spatial(Layer)
 LAYER = crop(LAYER, Extent)
+raster::crs(LAYER) <- raster::crs(CRS_Layer)
 
 names(LAYER)[names(LAYER) == Field] = "Field"
 LAYER = remove.duplicates(LAYER)
@@ -314,7 +322,7 @@ VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
 # AUTOMATIC RESOLUTION ====================================================
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/150)
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
     })
 
 # GRID =================================================
@@ -454,7 +462,7 @@ rp = create_report(Create_report, Open_report)
 # ======================================================
 nome_doc = paste("kriging on the field vector:", Field)
 msg_toc = function(tic,toc,msg,arq){
-  paste(" ----------------------------------\n",
+  paste("\n ----------------------------------\n",
         arq, "\n",
         "R algorithm completed in",round(toc - tic, 3), "seconds\n",
         "Report created on",Report,"\n",
