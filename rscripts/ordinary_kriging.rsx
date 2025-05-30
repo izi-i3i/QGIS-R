@@ -3,8 +3,7 @@
 #'         : It allows to auto select the initial values for nugget, psill and range; or it can fit a model
 #'         : from initial values provided. Besides, you can limit the number of points used to predict.</p>
 #' Layer: Points vector layer.
-#' CRS_Layer: Decimal degree coordinate is transformed to planar coordinate, default is EPSG:3395
-#' Mask_layer: Clip raster prediction.
+#' CRS_Layer: Decimal degree coordinate is transformed to planar coordinate.
 #' Field: numeric field from layer to interpolate.
 #' Log_Field: If checked, logarithmize the vector values. Field = log(Field)
 #' Extent: Specifies a numeric variable of length 4 values (xmin, xmax, ymin and ymax).
@@ -44,7 +43,7 @@
 #' OK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.7
+#' ALG_VERSION: 0.0.8
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
@@ -57,8 +56,8 @@
 ##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle;Convex hull ;
 ##Expand_vector=boolean True
-##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
-##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
+##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
+##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Auto_fit_variogram=boolean True
 ##Estimate_Range_and_Psill=boolean True
@@ -71,17 +70,19 @@
 ##Set_Seed=string "1234"
 ##Create_report=boolean True
 ##Open_report=boolean False
-##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
+##Color_report=enum literal Turbo;Spectral;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|10
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
-##QgsProcessingParameterFile|rscripts_folder|rscripts path|1|||True
+##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 ##OK_variance=output raster
 ##OK_prediction=output raster
-###OK_clip_prediction=output raster
+##OK_clip_prediction=output raster
 
+# OPTIONS =================================================================
+options(scipen = 9999) # scientific notation
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
@@ -94,8 +95,10 @@ for (pac in packages) {
   }
 }
 
-
 # DIR QGIS3 ===============================================================
+if(!dir.exists(rscripts_folder))
+  stop(sprintf("\nFolder path ('%s') does not exist!", rscripts_folder), call. = FALSE)
+
 file_path = file.path(getwd(), ".rscript_path")
 
 if (!file.exists(file_path))
@@ -115,7 +118,7 @@ if (!file.exists(file_path))
 }
 
 if (file.exists(file_path) & rscripts_folder != "")
-{ # file=EXISTS; folder=NON-EMPTY
+{ # file=exists; folder=non-empty
   dir_path <- rscripts_folder
   dir_path_aux <- readLines(file_path)
   if (dir_path != dir_path_aux)
@@ -124,37 +127,43 @@ if (file.exists(file_path) & rscripts_folder != "")
     writeLines(dir_path, fileConn)
     close(fileConn)
   }
-} else {# file=EXISTS; folder=EMPTY
-  dir_path_aux = rscripts_folder
-  dir_path = readLines(file_path)
+} else if (file.exists(file_path)) {
+    dir_path = dir_path_aux = readLines(file_path)
+  } else {
+    dir_path_aux = rscripts_folder
+    dir_path = readLines(file_path)
 }
 
-if(!dir.exists(dir_path)) stop("directory does not exist", call. = FALSE)
+if(!dir.exists(dir_path))
+  stop(sprintf("\nFolder path ('%s') does not exist!", dir_path), call. = FALSE)
 
 # READ FUNCTIONS ==========================================================
-sourceFun = function(x, path, trace = FALSE, ...)
+sourceFun = function(x, path, ...)
 {
-  list_file = list.files(path, recursive = TRUE, full.names = TRUE)
-  arq = grep(paste0(x, collapse="|"), list_file, value = TRUE)
-  for (i in 1:length(arq)) {
-    if(trace) cat(i,":", arq[i], "\n", sep="")
+  list_files = list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
+  arq = grep(paste0(x, collapse="|"), list_files, value = TRUE)
+  cat("Loading required functions:\n")
+  for (i in 1:length(arq))
+  {
+    cat(" ----------------------------------\n")
+    cat(i,":", arq[i], "\n", sep="")
     source(arq[i])
-  }#end for
+  }
+  cat(" ----------------------------------\n\n")
 }
 
-cat("\n ----------------------------------\n")
-cat("Loading required functions:\n")
 fun = c("get_grid.R",
         "plot_variogram.R",
         "create_report.R",
         "change_dir.R",
         "find_file.R",
-        "round_df.R")
-sourceFun(fun, path = dir_path, trace=TRUE)
-cat(" ----------------------------------\n\n")
+        "round_df.R",
+        "is_crs_planar",
+        "get_stats.R")
+sourceFun(fun, path = dir_path, trace = TRUE)
 
 # CHANGE DIR ==============================================================
-change_dir("ordinary_kriging.rsx", dir_path, dir_path_aux)
+change_dir("ordinary_kriging.rsx", dir_path, dir_path_aux, pattern="\\.rsx$")
 
 # SEED ====================================================================
 if(Set_Seed == "") Set_Seed = NULL
@@ -176,31 +185,32 @@ Colors = list(
      )
 Color_report = as.character(Colors[[Color_report]])
 
-# LAYER TRANSFORM =================================
-crs_layer = raster::crs(Layer)
-crs_unit = st_crs(crs_layer, parameters = TRUE)$units_gdal
-
-if (crs_unit != "metre")
+# LAYER CRS-TRANSFORM =================================
+if (is_crs_planar(Layer))
 {
-  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
-  Layer = st_transform(Layer, crs = CRS_Layer)
+  CRS_Layer = raster::crs(Layer)
 } else {
-  CRS_Layer = crs_layer
+  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
+  Layer = st_transform(Layer, crs = CRS_Layer, agr = "constant")
 }
 
-# INFO ============================================
-# scientific notation
-options(scipen = 9999)
-# extract crs
+# extract crs layer
 crs_info = st_crs(Layer)
 crs_num = crs_info$epsg
+
+if (!is_crs_planar(Layer))
+  stop(
+    sprintf("CRS_Layer ('%s') is not a planar coordinate!\nChange to a planar coordinate, example EPSG:3857.",
+            crs_num), call. = FALSE)
+
+# INFO ============================================
 crs_proj = st_crs(st_sfc(crs = crs_num))
 epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
 
 # CRS ==============================================
-ex = data.frame(x=Extent[1:2], y=Extent[3:4])
-L1 = st_as_sf(ex, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
-L2 = st_transform(L1, crs = CRS_Layer)
+xy = data.frame(x=Extent[1:2], y=Extent[3:4])
+L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
+L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
 Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
 
 # LAYER ============================================
@@ -239,7 +249,6 @@ mt_select = model_type[sort(Model+1)]
 
 pn = model %in% c("Pow", "Nug")
 ln = length(model)
-
 
 if(ln > 15 | sum(pn) > 0)
 {
@@ -280,7 +289,9 @@ if(Auto_fit_variogram)
   var_model = fit_var$var_model
   vg = fit_var$exp_var
   var_sserr = fit_var$sserr
+
 } else {
+
   vg = variogram(g)
 
   if(any(model %in% "Pow"))
@@ -310,6 +321,7 @@ if(Auto_fit_variogram)
   var_sserr = attr(var_model, "SSErr")
 }
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
+VAR_DF = round_df(VAR_DF, 4)
 
 # AUTOMATIC RESOLUTION ====================================================
 Resolution = tryCatch(abs(as.integer(Resolution)),
@@ -336,12 +348,13 @@ if(Local_kriging)
 PRED_RASTER = raster(OK["var1.pred"])
 VAR_RASTER = raster(OK["var1.var"])
 
-
 # CROP AND MASK ===========================================================
 if(!is.null(Mask_layer))
 {
+  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
   poly_crop = st_crop(Mask_layer, Extent)
   MASK_PRED <- raster::mask(PRED_RASTER, poly_crop)
+
 } else {
 
   dat1=list()
@@ -356,54 +369,27 @@ if(!is.null(Mask_layer))
       crs=crs(PRED_RASTER))
 }
 
-# OUT =================================================
+# OUT RASTER ==========================================
 OK_variance = VAR_RASTER
 OK_prediction = PRED_RASTER
 OK_clip_prediction = MASK_PRED
 
-# CROSS VALIDATION =====================================
-KCV = krige.cv(frm, LAYER, var_model, nmax = 25, nfold = 5, verbose = FALSE)
+# CROSS VALIDATION ====================================
+KCV = krige.cv(frm, LAYER, var_model, nmax = Nearest_observations, nfold = Nearest_observations, verbose = FALSE)
 KCV_DF = as.data.frame(KCV)
-# sserr = attr(var_model, "SSErr")
-# Mean error, ideally 0:
-mean_error_res = mean(KCV$residual)
-# Mean Square Prediction Error, ideally small
-mspe = mean(KCV$residual^2)
-# Mean square normalized error, ideally close to 1
-mean_z2 = mean(KCV$zscore^2)
-# Correlation observed and predicted, ideally 1
-cor_obs_pred = cor(KCV$observed, KCV$var1.pred)
-# Correlation predicted and residual, ideally 0
-cor_pred_red = cor(KCV$var1.pred, KCV$residual)
 
-STAT = data.frame(Stat = c("Sum of Squares Error (SSE)",
-                           "Mean error residual",
-                           "Mean Square Prediction Error (MSPE)",
-                           "Mean square normalized error",
-                           "Correlation observed and predicted",
-                           "Correlation predicted and residual"),
-                  Observed = c(var_sserr, mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red),
-                  Ideally = c(0, 0, "small", "close to 1", 1, 0))
-STAT = round_df(STAT, 4)
+ST = get_stats(KCV)
+
+STAT = ST[['stats']]
+ST[['mean_error_res']]
 
 # PRINT ===============================================
 printInfo <- function()
 {
-  cat("Model:","\n")
-  print(VAR_DF, row.names = TRUE,right = TRUE)
+  cat("Time:", format(Sys.time(), "%Y-%m-%d %X %Z"), "\n")
   cat("\nResolution:", Resolution,"meter\n")
-  cat("\nStatistical:\n")
-  cat("SSE:", attr(var_model, "SSErr"),"\n")
-  cat("Mean error residual:", mean_error_res, "\n")
-  cat("MSPE:", mspe, "\n")
-  cat("Mean square normalized error:", mean_z2, "\n")
-  cat("Correlation observed and predicted:", cor_obs_pred, "\n")
-  cat("Correlation predicted and residual:", cor_pred_red, "\n")
 }
 printInfo()
-
 # REPORT ==============================================
 rp = create_report(Create_report, Open_report)
-
-# ==================== END =============================
 
