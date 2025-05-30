@@ -14,8 +14,8 @@
 #' Cluster: Number clusters
 #' Set_seed: set seed
 #' ALG_DESC: This file creates a simple vector
-#' ALG_CREATOR: Izi i3i
-#' ALG_HELP_CREATOR: i3i
+#' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
+#' ALG_HELP_CREATOR: izi-i3i
 #' ALG_VERSION: 0.0.1
 
 ##[Spatial Points]=group
@@ -29,6 +29,7 @@
 ##QgsProcessingParameterNumber|Iter|Iteraction|QgsProcessingParameterNumber.Integer|4
 ##Set_seed=optional number
 ##Spatial_sampling=output vector
+
 if(is.null(Layer_raster) & is.null(Layer_vector)) {stop("Insert a layer RASTER or VECTOR")}
 
 if(!is.null(Layer_vector))
