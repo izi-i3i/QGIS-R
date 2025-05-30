@@ -53,16 +53,16 @@
 ##[R-Geostatistics]=group
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
-##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer|2|None|True
+##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer (clip prediction)|2|None|True
 ##Field=Field Layer
 ##Log_Field=boolean False
 ##Extent=extent
 ##CRS_Extent=expression @project_crs
 ##Grid_method=enum literal Rectangle;Convex hull ;
-##Block_size=string "0, 0"
+##Block_size=string "0,0"
 ##Expand_vector=boolean True
-##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
-##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.01
+##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
+##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Auto_fit_variogram=boolean True
 ##Estimate_Range_and_Psill=boolean True
@@ -75,17 +75,18 @@
 ##Set_Seed=string "1234"
 ##Create_report=boolean True
 ##Open_report=boolean False
-##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
-#QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|10
+##Color_report=enum literal Turbo;Spectral;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
 ##Report=output file docx
-##QgsProcessingParameterFile|rscripts_folder|rscripts path|1|||True
+##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 ##UK_variance=output raster
 ##UK_prediction=output raster
 ##UK_clip_prediction=output raster
 
+# OPTIONS =================================================================
+options(scipen = 9999) # scientific notation
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
@@ -101,7 +102,10 @@ for (pac in packages) {
 # DIR QGIS3 ===============================================================
 file_path = file.path(getwd(), ".rscript_path")
 
-if (!file.exists(file_path))
+if (!dir.exists(rscripts_folder) & rscripts_folder != "")
+  stop(sprintf("\nFolder path ('%s') does not exist!", rscripts_folder), call. = FALSE)
+
+if (!file.exists(file_path) & rscripts_folder == "")
 {
   os <- .Platform$OS.type
   if(os == "unix"){
@@ -118,7 +122,7 @@ if (!file.exists(file_path))
 }
 
 if (file.exists(file_path) & rscripts_folder != "")
-{ # file=EXISTS; folder=NON-EMPTY
+{ # file=exists; folder=non-empty
   dir_path <- rscripts_folder
   dir_path_aux <- readLines(file_path)
   if (dir_path != dir_path_aux)
@@ -127,43 +131,49 @@ if (file.exists(file_path) & rscripts_folder != "")
     writeLines(dir_path, fileConn)
     close(fileConn)
   }
-} else { # file=EXISTS; folder=EMPTY
-  dir_path_aux = rscripts_folder
-  dir_path = readLines(file_path)
+} else if (file.exists(file_path)) {
+    dir_path = dir_path_aux = readLines(file_path)
+  } else {
+    dir_path_aux = rscripts_folder
+    dir_path = readLines(file_path)
 }
 
-if(!dir.exists(dir_path)) stop("directory does not exist", call. = FALSE)
+if(!dir.exists(dir_path))
+  stop(sprintf("\nFolder path ('%s') does not exist!", dir_path), call. = FALSE)
 
 # READ FUNCTIONS ==========================================================
-sourceFun = function(x, path, trace = FALSE, ...)
+sourceFun = function(x, path, ...)
 {
-  list_file = list.files(path, recursive = TRUE, full.names = TRUE)
-  arq = grep(paste0(x, collapse="|"), list_file, value = TRUE)
-  for (i in 1:length(arq)) {
-    if(trace) cat(i,":", arq[i], "\n", sep="")
+  list_files = list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
+  arq = grep(paste0(x, collapse="|"), list_files, value = TRUE)
+  cat("Loading required functions:\n")
+  for (i in 1:length(arq))
+  {
+    cat(" ----------------------------------\n")
+    cat(i,":", arq[i], "\n", sep="")
     source(arq[i])
-  }#end for
+  }
+  cat(" ----------------------------------\n\n")
 }
 
-cat("\n ----------------------------------\n")
-cat("Loading required functions:\n")
 fun = c("get_grid.R",
         "plot_variogram.R",
         "create_report.R",
         "change_dir.R",
         "find_file.R",
-        "round_df.R")
-sourceFun(fun, path = dir_path, trace=TRUE)
-cat(" ----------------------------------\n\n")
+        "round_df.R",
+        "is_crs_planar",
+        "get_stats.R")
+sourceFun(fun, path = dir_path, trace = TRUE)
 
-# CHANGE DIR ==============================================================
-change_dir("universal_kriging.rsx", dir_path, dir_path_aux)
+# CHANGE DIR ============================================
+change_dir("universal_kriging.rsx", dir_path, dir_path_aux, pattern="\\.rsx$")
 
-# SEED ====================================================================
+# SEED ==================================================
 if(Set_Seed == "") Set_Seed = NULL
 set.seed(Set_Seed)
 
-# COLOR ===================================================================
+# COLOR =================================================
 N_colors = 100
 dct = if(Invert_Color_Ramp) -1 else 1
 Colors = list(
@@ -179,31 +189,32 @@ Colors = list(
      )
 Color_report = as.character(Colors[[Color_report]])
 
-# LAYER TRANSFORM =================================
-crs_layer = raster::crs(Layer)
-crs_unit = st_crs(crs_layer, parameters = TRUE)$units_gdal
-
-if (crs_unit != "metre")
+# LAYER CRS-TRANSFORM =================================
+if (is_crs_planar(Layer))
 {
-  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
-  Layer = st_transform(Layer, crs = CRS_Layer)
+  CRS_Layer = raster::crs(Layer)
 } else {
-  CRS_Layer = crs_layer
+  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
+  Layer = st_transform(Layer, crs = CRS_Layer, agr = "constant")
 }
 
-# INFO ============================================
-# scientific notation
-options(scipen = 9999)
-# extract crs
+# extract crs layer
 crs_info = st_crs(Layer)
 crs_num = crs_info$epsg
+
+if (!is_crs_planar(Layer))
+  stop(
+    sprintf("CRS_Layer ('%s') is not a planar coordinate!\nChange to a planar coordinate, example EPSG:3857.",
+            crs_num), call. = FALSE)
+
+# INFO ============================================
 crs_proj = st_crs(st_sfc(crs = crs_num))
 epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
 
 # CRS ==============================================
-ex = data.frame(x=Extent[1:2], y=Extent[3:4])
-L1 = st_as_sf(ex, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
-L2 = st_transform(L1, crs = CRS_Layer)
+xy = data.frame(x=Extent[1:2], y=Extent[3:4])
+L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
+L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
 Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
 
 # LAYER ============================================
@@ -243,7 +254,6 @@ mt_select = model_type[sort(Model+1)]
 pn = model %in% c("Pow", "Nug")
 ln = length(model)
 
-
 if(ln > 15 | sum(pn) > 0)
 {
   if(ln < 15 & any(pn) & length(pn) < 3)
@@ -265,7 +275,7 @@ if(ln > 15 | sum(pn) > 0)
 # VARIOGRAM ========================================
 f = 'Field~x+y'
 frm = formula(f)
-gs = gstat(id = Field, formula = frm, data = LAYER)
+gs = gstat(formula = frm, data = LAYER)
 
 if(Auto_fit_variogram)
 {
@@ -283,7 +293,9 @@ if(Auto_fit_variogram)
   var_model = fit_var$var_model
   vg = fit_var$exp_var
   var_sserr = fit_var$sserr
+
 } else {
+
   vg = variogram(g)
 
   if(any(model %in% "Pow"))
@@ -312,13 +324,19 @@ if(Auto_fit_variogram)
   }
   var_sserr = attr(var_model, "SSErr")
 }
-
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
+VAR_DF = round_df(VAR_DF, 4)
 
-# AUTOMATIC RESOLUTION ====================================================
+# UNIVERSAL KRIGING ====================================
+Block_size = unlist(strsplit(Block_size, ","))
+Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
+
+# AUTOMATIC RESOLUTION =================================
+kr = if(any(Block_size > 0)) 250 else 400
+
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
     })
 
 # GRID =================================================
@@ -326,25 +344,21 @@ GRIDE = get_grid(layer = LAYER, resolution = Resolution,
                  grid.method = Grid_method, expand = Expand_vector,
                  fx = Expand_longitude, fy = Expand_latitude)
 
-# UNIVERSAL KRIGING ====================================
-Block_size = unlist(strsplit(Block_size, ","))
-Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
-
 kpred = predict(gs, newdata = GRIDE, block = Block_size)
 
 if(Local_kriging)
 {
-  UK = krige(id = Field, frm, locations = LAYER, newdata = kpred, model = var_model,
+  UK = krige(formula = frm, locations = LAYER, newdata = kpred, model = var_model,
              nmax = Nearest_observations, block = Block_size)
 } else {
-  UK = krige(id=Field, gs,formula = frm, locations=LAYER, newdata = kpred, model = var_model, block = Block_size)
+  UK = krige(formula = frm, locations=LAYER, newdata = kpred, model = var_model, block = Block_size)
 }
 
-# RASTER ==================================================================
+# RASTER ===============================================
 PRED_RASTER = raster(UK[1])
 VAR_RASTER = raster(UK[2])
 
-# CROP AND MASK ===========================================================
+# CROP AND MASK ========================================
 if(!is.null(Mask_layer))
 {
   poly_crop = st_crop(Mask_layer, Extent)
@@ -364,80 +378,28 @@ if(!is.null(Mask_layer))
       crs=crs(PRED_RASTER))
 }
 
-# OUT RASTER ==========================================
+# OUT RASTER ===========================================
 UK_variance = VAR_RASTER
 UK_prediction = PRED_RASTER
 UK_clip_prediction = MASK_PRED
 
 # CROSS VALIDATION =====================================
-get_stats <- function(x, method)
-{ # get cross validation statistics
-  sserr = attr(var_model, "SSErr")
-  mean_err <- mean(x$residual)
-  mspe <- mean(x$residual^2)
-  msne <- mean(x$zscore^2)
-  pred = x$observed - x$residual
-  cor_obs_pred <- cor(x$observed, pred)
-  cor_pred_resid <- cor(pred, x$residual)
-  rmse <- sqrt(sum(x$residual^2)/length(x$residual))
-
-  Stat = c("Sum of Squares Error (SSE)",
-           "Mean error residual",
-           "Mean Square Prediction Error (MSPE)",
-           "Mean square normalized error",
-           "Correlation observed and predicted",
-           "Correlation predicted and residual",
-           "Root Mean Square Error (RMSE)")
-  Observed = c(sserr, mean_err, mspe, msne, cor_obs_pred, cor_pred_resid, rmse)
-  Ideally = c(0, 0, "small", "close to 1", 1, 0, "small")
-  dfe = data.frame(Stat, Observed, Ideally)
-# dfe = data.frame(method = method, sserr, mean_err, mspe, msne, cor_obs_pred, cor_pred_resid, rmse)
-  dfe
-}
-
-
 KCV = krige.cv(frm, LAYER, var_model, nmax = Nearest_observations, nfold = Nearest_observations, verbose = FALSE)
-
 KCV_DF = as.data.frame(KCV)
-# sserr = attr(var_model, "SSErr")
-# Mean error, ideally 0:
-mean_error_res = mean(KCV$residual)
-# Mean Square Prediction Error, ideally small
-mspe = mean(KCV$residual^2)
-# Mean square normalized error, ideally close to 1
-mean_z2 = mean(KCV$zscore^2)
-# Correlation observed and predicted, ideally 1
-cor_obs_pred = cor(KCV$observed, KCV$var1.pred)
-# Correlation predicted and residual, ideally 0
-cor_pred_red = cor(KCV$var1.pred, KCV$residual)
 
-STAT = data.frame(Stat = c("Sum of Squares Error (SSE)",
-                           "Mean error residual",
-                           "Mean Square Prediction Error (MSPE)",
-                           "Mean square normalized error",
-                           "Correlation observed and predicted",
-                           "Correlation predicted and residual"),
-                  Observed = c(var_sserr, mean_error_res, mspe, mean_z2, cor_obs_pred, cor_pred_red),
-                  Ideally = c(0, 0, "small", "close to 1", 1, 0))
-STAT = round_df(STAT, 4)
+ST = get_stats(KCV)
+
+STAT = ST[['stats']]
+ST[['mean_error_res']]
 
 # PRINT ===============================================
 printInfo <- function()
 {
-  cat("Model:","\n")
-  print(VAR_DF, row.names = TRUE,right = TRUE)
+  cat("Time:", format(Sys.time(), "%Y-%m-%d %X %Z"), "\n")
   cat("\nResolution:", Resolution,"meter\n")
-  cat("\nStatistical:\n")
-  cat("SSE:", attr(var_model, "SSErr"),"\n")
-  cat("Mean error residual:", mean_error_res, "\n")
-  cat("MSPE:", mspe, "\n")
-  cat("Mean square normalized error:", mean_z2, "\n")
-  cat("Correlation observed and predicted:", cor_obs_pred, "\n")
-  cat("Correlation predicted and residual:", cor_pred_red, "\n")
 }
 printInfo()
 
 # REPORT ==============================================
 rp = create_report(Create_report, Open_report)
 
-# ==================== END =============================
