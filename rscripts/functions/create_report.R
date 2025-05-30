@@ -81,7 +81,7 @@ create_report = function(cr = TRUE, or = FALSE)
     scale_y_continuous(limits = c(0,NA), expand = expansion(mult=c(0,0.1))) +
     scale_x_continuous() +#(breaks = breaks) +
     theme(panel.grid.minor = element_blank(), plot.title = element_text(size = 12)) +
-    geom_vline(xintercept = mean_error_res, color="red", linetype = 2) +
+    geom_vline(xintercept = ST[['mean_error_res']], color="red", linetype = 2) +
     labs(x="Residual", y="Count", title="Histogram")
 
   a2 = ggplot(KCV_DF, aes(x=observed, y=var1.pred)) +

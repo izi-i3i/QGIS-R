@@ -7,7 +7,7 @@
 #-------------------------------------------
 change_dir = function(arq, dir_path, dir_path_aux, pattern = "\\.rsx$")
 {
-  h1 = "##QgsProcessingParameterFile|rscripts_folder|rscripts path|1||"
+  h1 = "##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||"
   h2 = "|True"
 
   old_dir = paste0(h1, dir_path_aux, h2)
@@ -22,5 +22,8 @@ change_dir = function(arq, dir_path, dir_path_aux, pattern = "\\.rsx$")
     fileConn = file(fp)
     writeLines(txt, fileConn)
     close(fileConn)
+    cat("\n ----------------------------------\n")
+    cat("  Path to rscript folder - Updated!\n")
+    cat(" ----------------------------------\n\n")
   }
 }
