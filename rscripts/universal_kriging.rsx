@@ -29,8 +29,17 @@
 #' Nugget: Iniital value for nugget
 #' Range: Initial value for range
 #' Psill: Initial value for partial sill
-#' Local_kriging: If checked, points to interpolate will be limited to a number of nearest observations.
-#' Number_of_nearest_observations: Maximun number of observations used in local kriging.
+#' Maximum: the number of nearest observations that
+#'        : should be used for a kriging prediction or simulation, where
+#'        : nearest is defined in terms of the space of the spatial
+#'        : locations. By default, all observations are used.
+#' Minimum: if the number of nearest observations within
+#'        : distance ‘maxdist’ is less than ‘nmin’, a missing value will be generated.
+#' N_fold: if larger than 1, then apply n-fold cross validation;
+#'       : if ‘nfold’ equals ‘nrow(data)’ (the default), apply
+#'       : leave-one-out cross validation; if set to e.g. 5, five-fold
+#'       : cross validation is done. To specify the folds, pass an integer
+#'       : vector of length ‘nrow(data)’ with fold indexes.
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
 #' Set_Seed: Ensures that the same random values are produced every time you run the code
 #'         : In blank the number generation is random.
@@ -46,7 +55,7 @@
 #' UK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.3
+#' ALG_VERSION: 0.0.4
 
 
 ##Universal Kriging=name
@@ -54,25 +63,25 @@
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (meter)|EPSG:3395
 ##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer (clip prediction)|2|None|True
+##Extent=optional extent
 ##Field=Field Layer
 ##Log_Field=boolean False
-##Extent=extent
 ##CRS_Extent=expression @project_crs
+
 ##Grid_method=enum literal Rectangle;Convex hull ;
 ##Block_size=string "0,0"
-##Expand_vector=boolean True
-##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
-##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Auto_fit_variogram=boolean True
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
 ##Psill=number 0
-##Local_kriging=boolean False
-##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
+##QgsProcessingParameterString|Maximum|Maximum (Number of nearest observations)|Inf
+##QgsProcessingParameterNumber|Minimum|Minimum|QgsProcessingParameterNumber.Integer|0
+##QgsProcessingParameterNumber|N_fold|N-fold cross validation|QgsProcessingParameterNumber.Integer|10
 ##Resolution=string "auto"
 ##Set_Seed=string "1234"
+
 ##Create_report=boolean True
 ##Open_report=boolean False
 ##Color_report=enum literal Turbo;Spectral;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
@@ -84,6 +93,8 @@
 ##UK_variance=output raster
 ##UK_prediction=output raster
 ##UK_clip_prediction=output raster
+
+# sex 30 mai 2025 02:39:44
 
 # OPTIONS =================================================================
 options(scipen = 9999) # scientific notation
@@ -146,14 +157,12 @@ sourceFun = function(x, path, ...)
 {
   list_files = list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
   arq = grep(paste0(x, collapse="|"), list_files, value = TRUE)
-  cat("Loading required functions:\n")
-  for (i in 1:length(arq))
-  {
-    cat(" ----------------------------------\n")
-    cat(i,":", arq[i], "\n", sep="")
-    source(arq[i])
-  }
-  cat(" ----------------------------------\n\n")
+  for (i in 1:length(arq)) { source(arq[i]) }
+#   cat("", dirname(arq[i]), "\n")
+  cat("\nLoading required function files:\n")
+  cat("----------------------------------\n")
+  cat(x, sep="\n")
+  cat("----------------------------------\n\n")
 }
 
 fun = c("get_grid.R",
@@ -174,7 +183,7 @@ if(Set_Seed == "") Set_Seed = NULL
 set.seed(Set_Seed)
 
 # COLOR =================================================
-N_colors = 100
+N_colors = 10
 dct = if(Invert_Color_Ramp) -1 else 1
 Colors = list(
      "Spectral" = paletteer::paletteer_c("grDevices::Spectral", N_colors, direction = dct),
@@ -198,7 +207,7 @@ if (is_crs_planar(Layer))
   Layer = st_transform(Layer, crs = CRS_Layer, agr = "constant")
 }
 
-# extract crs layer
+# EXTRACT CRS LAYER ===================================
 crs_info = st_crs(Layer)
 crs_num = crs_info$epsg
 
@@ -211,11 +220,16 @@ if (!is_crs_planar(Layer))
 crs_proj = st_crs(st_sfc(crs = crs_num))
 epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
 
-# CRS ==============================================
-xy = data.frame(x=Extent[1:2], y=Extent[3:4])
-L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
-L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
-Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
+# EXTENT ===========================================
+if(is.null(Extent))
+{
+  Extent = extent(st_bbox(Layer))
+} else {
+  xy = data.frame(x=Extent[1:2], y=Extent[3:4])
+  L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
+  L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
+  Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
+}
 
 # LAYER ============================================
 LAYER = as_Spatial(Layer)
@@ -327,45 +341,39 @@ if(Auto_fit_variogram)
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
 VAR_DF = round_df(VAR_DF, 4)
 
-# UNIVERSAL KRIGING ====================================
+# TRANSFORM STRING (Block_size) INTO NUMERIC ===========
 Block_size = unlist(strsplit(Block_size, ","))
 Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
 
 # AUTOMATIC RESOLUTION =================================
-kr = if(any(Block_size > 0)) 250 else 400
+kr = if(any(Block_size > 0)) 150 else 400
 
+# transform string (Block_size) into numeric
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
       round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
     })
 
 # GRID =================================================
-GRIDE = get_grid(layer = LAYER, resolution = Resolution,
-                 grid.method = Grid_method, expand = Expand_vector,
-                 fx = Expand_longitude, fy = Expand_latitude)
+GRIDE = get_grid(layer = LAYER, extent = Extent, resolution = Resolution,
+                 grid.method = Grid_method)
 
+# PREDICT ==============================================
 kpred = predict(gs, newdata = GRIDE, block = Block_size)
 
-if(Local_kriging)
-{
-  UK = krige(formula = frm, locations = LAYER, newdata = kpred, model = var_model,
-             nmax = Nearest_observations, block = Block_size)
-} else {
-  UK = krige(formula = frm, locations=LAYER, newdata = kpred, model = var_model, block = Block_size)
-}
+# TRANSFORM STRING (Maximum) INTO NUMERIC ==============
+Maximum = tryCatch(abs(as.numeric(Maximum)), warning = function(w) { Inf })
+
+# KRIGING ==============================================
+UK = krige(frm, LAYER, newdata = kpred, model = var_model, nmax = Maximum, nmin = Minimum, block = Block_size)
 
 # RASTER ===============================================
 PRED_RASTER = raster(UK[1])
 VAR_RASTER = raster(UK[2])
 
 # CROP AND MASK ========================================
-if(!is.null(Mask_layer))
+if (is.null(Mask_layer))
 {
-  poly_crop = st_crop(Mask_layer, Extent)
-  MASK_PRED <- raster::mask(PRED_RASTER, poly_crop)
-
-} else {
-
   dat1=list()
   dat1$x=seq(Extent[1], by = .1, len = 2)
   dat1$y=seq(Extent[3], by = .1, len = 2)
@@ -376,6 +384,10 @@ if(!is.null(Mask_layer))
       xmn=range(dat1$x)[1], xmx=range(dat1$x)[2],
       ymn=range(dat1$y)[1], ymx=range(dat1$y)[2], 
       crs=crs(PRED_RASTER))
+} else {
+  st_agr(Mask_layer) = "constant"
+  poly_crop = st_crop(Mask_layer, Extent)
+  MASK_PRED <- raster::mask(PRED_RASTER, poly_crop)
 }
 
 # OUT RASTER ===========================================
@@ -384,7 +396,12 @@ UK_prediction = PRED_RASTER
 UK_clip_prediction = MASK_PRED
 
 # CROSS VALIDATION =====================================
-KCV = krige.cv(frm, LAYER, var_model, nmax = Nearest_observations, nfold = Nearest_observations, verbose = FALSE)
+
+# if larger than 1, then apply n-fold cross validation
+if(N_fold < 2) N_fold = nrow(LAYER@data)
+
+# Cross validation functions
+KCV = krige.cv(frm, LAYER, var_model, nmax = Maximum, nfold = N_fold, verbose = FALSE)
 KCV_DF = as.data.frame(KCV)
 
 ST = get_stats(KCV)
