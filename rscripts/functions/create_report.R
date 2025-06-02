@@ -20,16 +20,16 @@ create_report = function(cr = TRUE, or = FALSE)
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
   LAYER_DF = as.data.frame(LAYER)
 
-  pr = str2lang(names(PRED_RASTER_DF)[3])
+#   pr = str2lang(names(PRED_RASTER_DF)[3])
 
   p2 = ggplot() +
     theme_bw() +
-    geom_raster(data = PRED_RASTER_DF , aes(x = x, y = y, fill = eval(pr))) +
+    geom_tile(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
     scale_x_continuous(expand = expansion(mult=0.01)) +
-    coord_fixed(expand = TRUE, clip = "off") +
+        coord_sf(crs = CRS_Layer, datum = CRS_Layer, clip = "off") +
     theme(axis.text.y = element_text(angle=90, hjust=.5),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
@@ -39,11 +39,11 @@ create_report = function(cr = TRUE, or = FALSE)
   # PLOT VARIOGRAM ========================================
   VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
 
-  vr = str2lang(names(VAR_RASTER_DF)[3])
+#   vr = str2lang(names(VAR_RASTER_DF)[3])
 
   p3 = ggplot() +
     theme_bw() +
-    geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = eval(vr))) +
+    geom_tile(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
@@ -56,11 +56,11 @@ create_report = function(cr = TRUE, or = FALSE)
     labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
 
   # CLOUD VARIOGRAM =========================================================
-  # variogram calculation, cloud=TRUE is for cloud scatter 
+  # variogram calculation, cloud=TRUE is for cloud scatter
   meuse.varioc <- variogram(frm, LAYER, cloud=TRUE)
 
   # Customizing the cloud plot
-  p4 = ggplot(meuse.varioc, aes(x=meuse.varioc$dist, y=meuse.varioc$gamma)) + 
+  p4 = ggplot(meuse.varioc, aes(x=meuse.varioc$dist, y=meuse.varioc$gamma)) +
     geom_point(color = "blue", fill = "blue", size = 2, alpha = 0.25) +
     scale_x_continuous(expand = expansion(mult=0.03)) +
     scale_y_continuous(expand = expansion(mult=0.01)) +
@@ -68,10 +68,30 @@ create_report = function(cr = TRUE, or = FALSE)
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(title = NULL,
-         x = "h(m)",
-         y = bquote(gamma~"(h)"))
+    labs(title = NULL, x = "h(m)", y = bquote(gamma~"(h)"))
 
+  # CLIP KRIGING ============================================================
+  var1.pred = slot(MASK_PRED@data, "values")
+  coords = raster::xyFromCell(MASK_PRED, seq_len(ncell(MASK_PRED)))
+  MASK_PRED_DF = data.frame(coords, var1.pred)
+#   MASK_PRED_DF =MASK_PRED_DF[!is.na(MASK_PRED_DF$var1.pred),]
+
+  p5 = ggplot() +
+    theme_bw() +
+    geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = TRUE) +
+    geom_sf(data=poly_crop, fill=NA, linewidth=.5) +
+    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
+    scale_fill_palette_c(Color_report) +
+    scale_y_continuous(expand = expansion(mult=0.1)) +
+    scale_x_continuous(expand = expansion(mult=0.1)) +
+    coord_sf(crs = CRS_Layer, datum = CRS_Layer, clip = "off") +
+    theme(axis.text.y = element_text(angle=90, hjust=.5),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'white')
+          ) +
+    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
+
+  # =========================================================================
   # Calculating the Sturges bins
   breaks = pretty(range(KCV$residual), n = nclass.Sturges(KCV$residual), min.n = 1)
 
@@ -121,6 +141,7 @@ create_report = function(cr = TRUE, or = FALSE)
   txt_variogram = fpar("", run_linebreak())
   txt_kriging = fpar("",run_linebreak())
   txt_variance = fpar("",run_linebreak())
+  txt_kriging_clip = fpar("",run_linebreak())
 
   mdf_model = as.character(VAR_DF$model)
 
@@ -147,10 +168,16 @@ create_report = function(cr = TRUE, or = FALSE)
   cap_fig_p2 = paste("Final result of interpolation, the prediction map.")
   cap_fig_p3 = "Final result of interpolation, the variance or error map."
   cap_fig_p4 = paste("Variogram Cloud -", Field)
+  cap_fig_p5 = paste("Clip kriging -", Field)
 
   run_num = run_autonum(seq_id = "fig", pre_label = "Figure ", bkm = "figure")
   run_num_table = run_autonum(seq_id = "tab", pre_label = "Table ", bkm = "table")
 
+  # =========================================================================
+  cap = capture.output(summary(warnings()))
+# NOTE: "Verificar erro PCDATA invalid Char value 27 [9], provocado pelo warning do ggplot2
+
+  # =========================================================================
   doc = read_docx() |>
     body_add(title_) |>
     body_add(value = txt_open, style = "Normal") |>
@@ -199,8 +226,15 @@ create_report = function(cr = TRUE, or = FALSE)
 
     body_add_break() |>
 
+    body_add_par(value = "Clip Ordinary Kriging simulation", style = "heading 1") |>
+    body_add(value = txt_kriging_clip, style = "Normal") |>
+    body_add_gg(value = p5, width = 6.3, height = 6.3, res=150) |>
+    body_add_caption(value = block_caption(cap_fig_p5, style = "Normal", autonum = run_num)) |>
+
+    body_add_break() |>
+
     body_add_par(value = "Warnings", style = "heading 1") |>
-    body_add(value = capture.output(summary(warnings())), style = "Normal") |>
+    body_add(value =  cap, style = "Normal") |>
 
     body_add_par(value = "Session Info", style = "heading 1") |>
     body_add(value = capture.output(sessionInfo()), style = "Normal")
@@ -208,6 +242,6 @@ create_report = function(cr = TRUE, or = FALSE)
   print(doc, target = Report)
   if(or) browseURL(Report)
 
-  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4, g1=g1)))
+  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4, p5=p5, g1=g1)))
 }
 
