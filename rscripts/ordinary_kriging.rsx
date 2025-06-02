@@ -10,10 +10,8 @@
 #' Grid_method: Method to calculate the extent of interpolation.
 #'            : Rectangle = rectangular layer,
 #'            : Convex hull = Compute Convex Hull of a set of points.
-#' Expand_vector: If checked, expands the longitude and latitude (only in rectangle) values by the value in
-#'              : Expand_longitude and Expand_latitude
-#' Expand_longitude: value added to longitude.
-#' Expand_latitude: value added to latitude.
+#' Block_size: block size; a vector with 1, 2 or 3 values containing the size
+#'           : of a rectangular in x-, y- and z-dimension respectively.
 #' Model: Spherical (Sph), Exponential (Exp), Gaussian (Gau), Matern (Mat),
 #'      : Matern Stein's parameterization (Ste), Exponential class (Exc),
 #'      : Circular (Cir), Linear (Lin), Bessel (Bes), Pentaspherical (Pen),
@@ -26,14 +24,23 @@
 #' Nugget: Iniital value for nugget
 #' Range: Initial value for range
 #' Psill: Initial value for partial sill
-#' Local_kriging: If checked, points to interpolate will be limited to a number of nearest observations.
-#' Number_of_nearest_observations: Maximun number of observations used in local kriging.
+#' Maximum: the number of nearest observations that
+#'        : should be used for a kriging prediction or simulation, where
+#'        : nearest is defined in terms of the space of the spatial
+#'        : locations. By default, all observations are used.
+#' Minimum: if the number of nearest observations within
+#'        : distance ‘maxdist’ is less than ‘nmin’, a missing value will be generated.
+#' N_fold: if larger than 1, then apply n-fold cross validation;
+#'       : if ‘nfold’ equals ‘nrow(data)’ (the default), apply
+#'       : leave-one-out cross validation; if set to e.g. 5, five-fold
+#'       : cross validation is done. To specify the folds, pass an integer
+#'       : vector of length ‘nrow(data)’ with fold indexes.
 #' Resolution: If the value is zero it will be calculated automatically, in meters.
 #' Set_Seed: Ensures that the same random values are produced every time you run the code
 #'         : In blank the number generation is random.
 #' Create_report: Create report with graphs.
 #' Open_report: Open report.
-#' Color_report: Select color palette: Turbo, Spectral, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
+#' Color_report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
 #' N_colors: Number of color ramp.
 #' Invert_Color_Ramp: Invert color ramp.
 #' Draw_lines_variogram: Draw lines variogram.
@@ -43,7 +50,7 @@
 #' OK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.0.8
+#' ALG_VERSION: 0.0.9
 
 ##Ordinary Kriging=name
 ##[R-Geostatistics]=group
@@ -52,26 +59,26 @@
 ##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer|2|None|True
 ##Field=Field Layer
 ##Log_Field=boolean False
-##Extent=extent
+##Extent=optional extent
 ##CRS_Extent=expression @project_crs
+
 ##Grid_method=enum literal Rectangle;Convex hull ;
-##Expand_vector=boolean True
-##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
-##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.1
+##Block_size=string "0,0"
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Auto_fit_variogram=boolean True
 ##Estimate_Range_and_Psill=boolean True
 ##Nugget=number 0
 ##Range=number 0
 ##Psill=number 0
-##Local_kriging=boolean False
-##QgsProcessingParameterNumber|Nearest_observations|Number of nearest observations|QgsProcessingParameterNumber.Integer|25
+##QgsProcessingParameterString|Maximum|Maximum (Number of nearest observations)|Inf
+##QgsProcessingParameterNumber|Minimum|Minimum|QgsProcessingParameterNumber.Integer|0
+##QgsProcessingParameterNumber|N_fold|N-fold cross validation|QgsProcessingParameterNumber.Integer|1
 ##Resolution=string "auto"
 ##Set_Seed=string "1234"
+
 ##Create_report=boolean True
 ##Open_report=boolean False
-##Color_report=enum literal Turbo;Spectral;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
-##QgsProcessingParameterNumber|N_colors|Number of colors ramp|QgsProcessingParameterNumber.Integer|10
+##Color_report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean True
@@ -80,6 +87,10 @@
 ##OK_variance=output raster
 ##OK_prediction=output raster
 ##OK_clip_prediction=output raster
+
+# sáb 31 mai 2025 15:40:59
+
+#-----------------------------------------------
 
 # OPTIONS =================================================================
 options(scipen = 9999) # scientific notation
@@ -90,7 +101,7 @@ packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","pa
 
 for (pac in packages) {
   if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
-    install.packages(pac, repos = getOption("repos"), dependencies=TRUE)
+    install.packages(pac, repos = "https://cloud.r-project.org", dependencies=TRUE)
     cat("package installed:", paste(pac, collapse = ", "),"\n")
   }
 }
@@ -142,14 +153,12 @@ sourceFun = function(x, path, ...)
 {
   list_files = list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
   arq = grep(paste0(x, collapse="|"), list_files, value = TRUE)
-  cat("Loading required functions:\n")
-  for (i in 1:length(arq))
-  {
-    cat(" ----------------------------------\n")
-    cat(i,":", arq[i], "\n", sep="")
-    source(arq[i])
-  }
-  cat(" ----------------------------------\n\n")
+  for (i in 1:length(arq)) { source(arq[i]) }
+#   cat("", dirname(arq[i]), "\n")
+  cat("\nLoading required function files:\n")
+  cat("----------------------------------\n")
+  cat(x, sep="\n")
+  cat("----------------------------------\n\n")
 }
 
 fun = c("get_grid.R",
@@ -194,7 +203,7 @@ if (is_crs_planar(Layer))
   Layer = st_transform(Layer, crs = CRS_Layer, agr = "constant")
 }
 
-# extract crs layer
+# EXTRACT CRS LAYER ===================================
 crs_info = st_crs(Layer)
 crs_num = crs_info$epsg
 
@@ -207,15 +216,20 @@ if (!is_crs_planar(Layer))
 crs_proj = st_crs(st_sfc(crs = crs_num))
 epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
 
-# CRS ==============================================
-xy = data.frame(x=Extent[1:2], y=Extent[3:4])
-L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
-L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
-Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
+# EXTENT ===========================================
+if(is.null(Extent))
+{
+  Extent = extent(st_bbox(Layer))
+} else {
+  xy = data.frame(x=Extent[1:2], y=Extent[3:4])
+  L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
+  L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
+  Extent = st_bbox(L2)[c('xmin', 'xmax', 'ymin', 'ymax')]
+}
 
 # LAYER ============================================
 LAYER = as_Spatial(Layer)
-LAYER = crop(LAYER, Extent)
+LAYER = raster::crop(LAYER, Extent)
 raster::crs(LAYER) <- raster::crs(CRS_Layer)
 
 names(LAYER)[names(LAYER) == Field] = "Field"
@@ -271,14 +285,14 @@ if(ln > 15 | sum(pn) > 0)
 # VARIOGRAM ========================================
 f = 'Field~1'
 frm = formula(f)
-g = gstat(id = Field, formula = frm, data = LAYER)
+gs = gstat(id = Field, formula = frm, data = LAYER)
 
 if(Auto_fit_variogram)
 {
   fit_var = autofitVariogram(frm,
                              LAYER,
                              model = model,
-                             kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10), 
+                             kappa = c(0.05, seq(0.2, 2, 0.1), 5, 10),
                              fix.values = c(NA,NA,NA),
                              verbose = F,
                              GLS.model = NA,
@@ -321,42 +335,41 @@ if(Auto_fit_variogram)
   var_sserr = attr(var_model, "SSErr")
 }
 VAR_DF = as.data.frame(var_model)[c("model", "psill", "range", "kappa")]
+
+# TRANSFORM STRING (Block_size) INTO NUMERIC ===========
+Block_size = unlist(strsplit(Block_size, ","))
+Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
 VAR_DF = round_df(VAR_DF, 4)
 
-# AUTOMATIC RESOLUTION ====================================================
+# AUTOMATIC RESOLUTION =================================
+kr = if(any(Block_size > 0)) 150 else 500
+
+# transform string (Block_size) into numeric
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/500)
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
     })
 
 # GRID =================================================
-GRIDE = get_grid(layer = LAYER, resolution = Resolution,
-                 grid.method = Grid_method, expand = Expand_vector,
-                 fx = Expand_longitude, fy = Expand_latitude)
+GRIDE = get_grid(layer = LAYER, extent = Extent, resolution = Resolution,
+                 grid.method = Grid_method)
+
+# PREDICT ==============================================
+kpred = predict(gs, newdata = GRIDE, block = Block_size)
+
+# TRANSFORM STRING (Maximum) INTO NUMERIC ==============
+Maximum = tryCatch(abs(as.numeric(Maximum)), warning = function(w) { Inf })
 
 # KRIGING ==============================================
-kpred = predict(g, newdata = GRIDE)
-
-if(Local_kriging)
-{
-  OK = krige(frm, LAYER, newdata = kpred, model = var_model, nmax = Nearest_observations)
-} else {
-  OK = krige(frm, LAYER, newdata = kpred, model = var_model)
-}
+OK = krige(frm, LAYER, newdata = kpred, model = var_model, nmax = Maximum, nmin = Minimum, block = Block_size)
 
 # RASTER ==================================================================
-PRED_RASTER = raster(OK["var1.pred"])
-VAR_RASTER = raster(OK["var1.var"])
+PRED_RASTER = raster(OK[1])
+VAR_RASTER = raster(OK[2])
 
 # CROP AND MASK ===========================================================
-if(!is.null(Mask_layer))
+if (is.null(Mask_layer))
 {
-  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
-  poly_crop = st_crop(Mask_layer, Extent)
-  MASK_PRED <- raster::mask(PRED_RASTER, poly_crop)
-
-} else {
-
   dat1=list()
   dat1$x=seq(Extent[1], by = .1, len = 2)
   dat1$y=seq(Extent[3], by = .1, len = 2)
@@ -365,8 +378,12 @@ if(!is.null(Mask_layer))
   MASK_PRED <-raster(
       dat1$z,
       xmn=range(dat1$x)[1], xmx=range(dat1$x)[2],
-      ymn=range(dat1$y)[1], ymx=range(dat1$y)[2], 
+      ymn=range(dat1$y)[1], ymx=range(dat1$y)[2],
       crs=crs(PRED_RASTER))
+} else {
+  st_agr(Mask_layer) = "constant"
+  poly_crop = st_crop(Mask_layer, Extent)
+  MASK_PRED <- raster::mask(PRED_RASTER, poly_crop)
 }
 
 # OUT RASTER ==========================================
@@ -375,13 +392,16 @@ OK_prediction = PRED_RASTER
 OK_clip_prediction = MASK_PRED
 
 # CROSS VALIDATION ====================================
-KCV = krige.cv(frm, LAYER, var_model, nmax = Nearest_observations, nfold = Nearest_observations, verbose = FALSE)
+# if larger than 1, then apply n-fold cross validation
+if(N_fold < 2) N_fold = nrow(LAYER@data)
+
+# Cross validation functions
+KCV = krige.cv(frm, LAYER, var_model, nmax = Maximum, nfold = N_fold, verbose = FALSE)
 KCV_DF = as.data.frame(KCV)
 
 ST = get_stats(KCV)
 
 STAT = ST[['stats']]
-ST[['mean_error_res']]
 
 # PRINT ===============================================
 printInfo <- function()
@@ -390,6 +410,9 @@ printInfo <- function()
   cat("\nResolution:", Resolution,"meter\n")
 }
 printInfo()
+
 # REPORT ==============================================
 rp = create_report(Create_report, Open_report)
 
+
+# ---------------------------------
