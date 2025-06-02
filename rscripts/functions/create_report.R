@@ -76,11 +76,17 @@ create_report = function(cr = TRUE, or = FALSE)
   MASK_PRED_DF = data.frame(coords, var1.pred)
 #   MASK_PRED_DF =MASK_PRED_DF[!is.na(MASK_PRED_DF$var1.pred),]
 
+  show_l = ifelse(is.null(Mask_layer), FALSE, TRUE)
   p5 = ggplot() +
     theme_bw() +
-    geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = TRUE) +
-    geom_sf(data=poly_crop, fill=NA, linewidth=.5) +
-    ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
+    geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = T, show.legend = show_l) +
+    ifelse(is.null(Mask_layer),
+         list(geom_sf(data=poly_crop, fill=NA, color="white", show.legend = show_l)),
+         list(geom_sf(data=poly_crop, fill=NA, linewidth=.5))
+         ) +
+    ifelse(Insert_points,
+           list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")),
+           list(NULL)) +
     scale_fill_palette_c(Color_report) +
     scale_y_continuous(expand = expansion(mult=0.1)) +
     scale_x_continuous(expand = expansion(mult=0.1)) +
@@ -174,7 +180,7 @@ create_report = function(cr = TRUE, or = FALSE)
   run_num_table = run_autonum(seq_id = "tab", pre_label = "Table ", bkm = "table")
 
   # =========================================================================
-  cap = capture.output(summary(warnings()))
+#   cap = capture.output(summary(warnings()))
 # NOTE: "Verificar erro PCDATA invalid Char value 27 [9], provocado pelo warning do ggplot2
 
   # =========================================================================
@@ -233,8 +239,8 @@ create_report = function(cr = TRUE, or = FALSE)
 
     body_add_break() |>
 
-    body_add_par(value = "Warnings", style = "heading 1") |>
-    body_add(value =  cap, style = "Normal") |>
+#     body_add_par(value = "Warnings", style = "heading 1") |>
+#     body_add(value =  cap, style = "Normal") |>
 
     body_add_par(value = "Session Info", style = "heading 1") |>
     body_add(value = capture.output(sessionInfo()), style = "Normal")

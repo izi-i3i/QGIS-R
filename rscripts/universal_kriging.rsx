@@ -384,6 +384,8 @@ if (is.null(Mask_layer))
       xmn=range(dat1$x)[1], xmx=range(dat1$x)[2],
       ymn=range(dat1$y)[1], ymx=range(dat1$y)[2], 
       crs=crs(PRED_RASTER))
+  pol = data.frame(x=Extent[1:2], y=Extent[3:4], id=1:2)
+  poly_crop = st_as_sf(pol, coords=c("x", "y"), crs=CRS_Layer)
 } else {
   st_agr(Mask_layer) = "constant"
   poly_crop = st_crop(Mask_layer, Extent)
