@@ -93,7 +93,6 @@
 ##OK_variance=output raster
 ##OK_prediction=output raster
 
-
 # ter 03 jun 2025 20:12:05
 #-----------------------------------------------
 
@@ -176,7 +175,8 @@ fun = c("get_grid.R",
         "round_df.R",
         "is_crs_planar",
         "get_stats.R",
-        "printInfo.R")
+        "printInfo.R",
+        "order_magnitude.R")
 sourceFun(fun, path = dir_path, trace = TRUE)
 
 # CHANGE DIR ==============================================================
@@ -245,6 +245,7 @@ raster::crs(LAYER) <- raster::crs(CRS_Layer)
 names(LAYER)[names(LAYER) == Field] = "Field"
 LAYER = remove.duplicates(LAYER)
 LAYER = LAYER[!is.na(LAYER$Field),]
+# if(is.character(LAYER$Field)) LAYER$Field = as.numeric(as.character(LAYER$Field))
 
 if(Log_Field)
 {
@@ -293,7 +294,7 @@ if(ln > 15 | sum(pn) > 0)
 }
 
 # VARIOGRAM ========================================
-form = c('Field ~ 1', 'I(Field > 6)~1')[1]
+form = 'Field ~ 1'
 frm = formula(form)
 gs = gstat(id = Field, formula = frm, data = LAYER)
 
@@ -385,9 +386,9 @@ VAR_RASTER = raster(OK[2])
 if (!is.null(Mask_layer))
 {
   st_agr(Mask_layer) = "constant"
-  poly_crop = st_crop(Mask_layer, Extent)
-  PRED_RASTER = raster::mask(PRED_RASTER, poly_crop)
-  VAR_RASTER = raster::mask(VAR_RASTER, poly_crop)
+  mask_crop = st_crop(Mask_layer, Extent)
+  PRED_RASTER = raster::mask(PRED_RASTER, mask_crop)
+  VAR_RASTER = raster::mask(VAR_RASTER, mask_crop)
 }
 # OUT RASTER ==========================================
 OK_variance = VAR_RASTER

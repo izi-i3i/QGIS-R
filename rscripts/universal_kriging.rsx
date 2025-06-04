@@ -90,7 +90,7 @@
 
 ##Create_Report=boolean True
 ##Open_Report=boolean False
-##Color_Ramp_Report=enum literal Turbo;Spectral;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako ;
+##Color_Ramp_Report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako;Regions ;
 ##Invert_Color_Ramp=boolean False
 ##Insert_points=boolean True
 ##Draw_lines_variogram=boolean False
@@ -179,7 +179,8 @@ fun = c("get_grid.R",
         "round_df.R",
         "is_crs_planar",
         "get_stats.R",
-        "printInfo.R")
+        "printInfo.R",
+        "order_magnitude.R")
 sourceFun(fun, path = dir_path, trace = TRUE)
 
 # CHANGE DIR ============================================
@@ -248,6 +249,7 @@ raster::crs(LAYER) <- raster::crs(CRS_Layer)
 names(LAYER)[names(LAYER) == Field] = "Field"
 LAYER = remove.duplicates(LAYER)
 LAYER = LAYER[!is.na(LAYER$Field),]
+# if(is.character(LAYER$Field)) LAYER$Field = as.numeric(as.character(LAYER$Field))
 
 if(Log_Field)
 {
@@ -355,16 +357,12 @@ Block_size = unlist(strsplit(Block_size, ","))
 Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
 
 # AUTOMATIC RESOLUTION =================================
+kr = if(any(Block_size > 0)) 150 else 400
+
+# resolution
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      a = (Extent[2] - Extent[1])^2
-      b = (Extent[4] - Extent[3])^2
-      hyp = sqrt(a + b)
-      kr = if(any(Block_size > 0)) 250 else 500
-      Resolution = as.integer(hyp/kr)
-      if(order_magnitude(hyp)[2] > 100000) Resolution = as.integer(Resolution * 1.5)
-      if(order_magnitude(hyp)[2] > 1000000) Resolution = as.integer(Resolution * 2.5)
-      Resolution
+      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
     })
 
 # GRID =================================================
@@ -388,9 +386,9 @@ VAR_RASTER = raster(UK[2])
 if (!is.null(Mask_layer))
 {
   st_agr(Mask_layer) = "constant"
-  poly_crop = st_crop(Mask_layer, Extent)
-  PRED_RASTER = raster::mask(PRED_RASTER, poly_crop)
-  VAR_RASTER = raster::mask(VAR_RASTER, poly_crop)
+  mask_crop = st_crop(Mask_layer, Extent)
+  PRED_RASTER = raster::mask(PRED_RASTER, mask_crop)
+  VAR_RASTER = raster::mask(VAR_RASTER, mask_crop)
 }
 
 # OUT RASTER ===========================================
