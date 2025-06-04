@@ -188,21 +188,21 @@ set.seed(Set_Seed)
 
 # COLOR ===================================================================
 N_colors = 100
-invert = if(Invert_Color_Ramp) -1 else 1
+reverse = if(Invert_Color_Ramp) -1 else 1
 Colors = list(
-      "Spectral" = hcl.colors(N_colors, rev = invert, palette = "Spectral"),
-      "Turbo" = viridis(N_colors, direction = invert, option = "turbo"),
-      "Magma" = viridis(N_colors, direction = invert, option = "magma"),
-      "Inferno" = hcl.colors(N_colors, rev = invert, palette = "Inferno"),
-      "Plasma" = hcl.colors(N_colors, rev = invert, palette = "Plasma"),
-      "Viridis" = hcl.colors(N_colors, rev = invert, palette = "Viridis"),
-      "Cividis" = hcl.colors(N_colors, rev = invert, palette = "Cividis"),
-      "Rocket" = hcl.colors(N_colors, rev = invert, palette = "Rocket"),
-      "Mako" = hcl.colors(N_colors, rev = invert, palette = "Mako"),
-      "Regions" = sp::get_col_regions()
+      "Spectral" = hcl.colors(N_colors, palette = "Spectral"),
+      "Inferno"  = hcl.colors(N_colors, palette = "Inferno"),
+      "Plasma"   = hcl.colors(N_colors, palette = "Plasma"),
+      "Viridis"  = hcl.colors(N_colors, palette = "Viridis"),
+      "Cividis"  = hcl.colors(N_colors, palette = "Cividis"),
+      "Rocket"   = hcl.colors(N_colors, palette = "Rocket"),
+      "Mako"     = hcl.colors(N_colors, palette = "Mako"),
+      "Turbo"    = viridis(N_colors, option = "turbo"),
+      "Magma"    = viridis(N_colors, option = "magma"),
+      "Regions"  = sp::get_col_regions()
       )
 # sort(hcl.pals())
-Color_ramp_report = Colors[[Color_Ramp_Report]]
+Color_ramp_report = if(reverse == 1) Colors[[Color_Ramp_Report]] else rev(Colors[[Color_Ramp_Report]])
 
 # LAYER CRS-TRANSFORM =================================
 if (is_crs_planar(Layer))
@@ -352,12 +352,16 @@ Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NO
 VAR_DF = round_df(VAR_DF, 4)
 
 # AUTOMATIC RESOLUTION =================================
-kr = if(any(Block_size > 0)) 250 else 500
-
-# transform string (Block_size) into numeric
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
+      a = (Extent[2] - Extent[1])^2
+      b = (Extent[4] - Extent[3])^2
+      hyp = sqrt(a + b)
+      kr = if(any(Block_size > 0)) 250 else 500
+      Resolution = as.integer(hyp/kr)
+      if(order_magnitude(hyp)[2] > 100000) Resolution = as.integer(Resolution * 1.5)
+      if(order_magnitude(hyp)[2] > 1000000) Resolution = as.integer(Resolution * 2.5)
+      Resolution
     })
 
 # GRID =================================================
