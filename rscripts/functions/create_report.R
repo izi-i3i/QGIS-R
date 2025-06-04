@@ -39,7 +39,7 @@ create_report = function(cr = TRUE, or = FALSE, tit = "Kriging Interpolation")
 
 #   pr = str2lang(names(PRED_RASTER_DF)[3])
 
-  mask_layer = ifelse(!is.null(Mask_layer), list(geom_sf(data=poly_crop, fill=NA,linewidth=.5)), list(NULL))
+  mask_layer = ifelse(!is.null(Mask_layer), list(geom_sf(data=mask_crop, fill=NA,linewidth=.5)), list(NULL))
 
   p2 = ggplot() +
     theme_bw() +
@@ -106,8 +106,8 @@ create_report = function(cr = TRUE, or = FALSE, tit = "Kriging Interpolation")
 #     theme_bw() +
 #     geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = T, show.legend = show_l) +
 #     ifelse(is.null(Mask_layer),
-#          list(geom_sf(data=poly_crop, fill=NA, color="white", show.legend = show_l)),
-#          list(geom_sf(data=poly_crop, fill=NA, linewidth=.5))
+#          list(geom_sf(data=mask_crop, fill=NA, color="white", show.legend = show_l)),
+#          list(geom_sf(data=mask_crop, fill=NA, linewidth=.5))
 #          ) +
 #     ifelse(Insert_points,
 #            list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")),

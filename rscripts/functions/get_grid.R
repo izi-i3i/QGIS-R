@@ -61,6 +61,7 @@ get_grid = function (x,
              d = rect_pol()
              warning("polygon is NULL, grid.method coerced to Rectangle", call. = FALSE)
            } else {
+             st_agr(mask.layer) = "constant"
              mask.l = st_crop(mask.layer, xmin=x1, ymin=y1, xmax=x2, ymax=y2)
              d = as(mask.l, "Spatial")
            }
