@@ -4,7 +4,7 @@
 # created     : terça mai 20, 2025 12:00:51 -03
 # Updated     :
 #-------------------------------------------
-create_report = function(cr = TRUE, or = FALSE)
+create_report = function(cr = TRUE, or = FALSE, tit = "Kriging Interpolation")
 {
   if(!cr) return(NULL)
 
@@ -18,18 +18,39 @@ create_report = function(cr = TRUE, or = FALSE)
 
   # PLOT KRIGING =========================================
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
+  max_pred = max(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
+  min_pred = min(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
   LAYER_DF = as.data.frame(LAYER)
+
+  if(F)
+  {
+    library(RColorBrewer)
+    myPallette <-
+      c(rev(brewer.pal(9, "YlOrRd"))
+        , "white"
+        , brewer.pal(9, "Blues"))
+
+    zCuts <- seq(min_pred,max_pred, length.out = 19)
+    ggplot(PRED_RASTER_DF, aes(x = x, y = y)) +
+      geom_raster(aes(fill = raster::cut(var1.pred, zCuts)), na.rm=T) +
+#       scale_fill_brewer(palette = "RdBu" , drop = FALSE)
+      scale_fill_manual(values = myPallette, drop = FALSE)
+  }
 
 #   pr = str2lang(names(PRED_RASTER_DF)[3])
 
+  mask_layer = ifelse(!is.null(Mask_layer), list(geom_sf(data=poly_crop, fill=NA,linewidth=.5)), list(NULL))
+
   p2 = ggplot() +
     theme_bw() +
-    geom_tile(data = PRED_RASTER_DF , aes(x = x, y = y, fill = var1.pred)) +
+    geom_tile(data = PRED_RASTER_DF, aes(x = x, y = y, fill = var1.pred)) +
+    mask_layer +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
-    scale_fill_palette_c(Color_report) +
-    scale_y_continuous(expand = expansion(mult=0.01)) +
-    scale_x_continuous(expand = expansion(mult=0.01)) +
-        coord_sf(crs = CRS_Layer, datum = CRS_Layer, clip = "off") +
+    scale_fill_gradientn(colors = Color_ramp_report, na.value = NA, limits = c(min_pred,max_pred)) +
+#     scale_fill_palette_c(Color_ramp_report) +
+    scale_y_continuous(expand = expansion(mult=0.02)) +
+    scale_x_continuous(expand = expansion(mult=0.02)) +
+    coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
     theme(axis.text.y = element_text(angle=90, hjust=.5),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
@@ -38,17 +59,21 @@ create_report = function(cr = TRUE, or = FALSE)
 
   # PLOT VARIOGRAM ========================================
   VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
+  max_var = max(VAR_RASTER_DF$var1.var, na.rm = TRUE)
+  min_var = min(VAR_RASTER_DF$var1.var, na.rm = TRUE)
 
 #   vr = str2lang(names(VAR_RASTER_DF)[3])
 
   p3 = ggplot() +
     theme_bw() +
     geom_tile(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var)) +
+    mask_layer +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
-    scale_fill_palette_c(Color_report) +
-    scale_y_continuous(expand = expansion(mult=0.01)) +
-    scale_x_continuous(expand = expansion(mult=0.01)) +
-    coord_fixed(expand = TRUE, clip = "off") +
+    scale_fill_gradientn(colors = Color_ramp_report, na.value = NA, limits = c(min_var,max_var)) +
+#     scale_fill_palette_c(Color_ramp_report) +
+    scale_y_continuous(expand = expansion(mult=0.02)) +
+    scale_x_continuous(expand = expansion(mult=0.02)) +
+    coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
     theme(axis.text.y = element_text(angle = 90, hjust = 0.5),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
@@ -71,31 +96,32 @@ create_report = function(cr = TRUE, or = FALSE)
     labs(title = NULL, x = "h(m)", y = bquote(gamma~"(h)"))
 
   # CLIP KRIGING ============================================================
-  var1.pred = slot(MASK_PRED@data, "values")
-  coords = raster::xyFromCell(MASK_PRED, seq_len(ncell(MASK_PRED)))
-  MASK_PRED_DF = data.frame(coords, var1.pred)
-#   MASK_PRED_DF =MASK_PRED_DF[!is.na(MASK_PRED_DF$var1.pred),]
-
-  show_l = ifelse(is.null(Mask_layer), FALSE, TRUE)
-  p5 = ggplot() +
-    theme_bw() +
-    geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = T, show.legend = show_l) +
-    ifelse(is.null(Mask_layer),
-         list(geom_sf(data=poly_crop, fill=NA, color="white", show.legend = show_l)),
-         list(geom_sf(data=poly_crop, fill=NA, linewidth=.5))
-         ) +
-    ifelse(Insert_points,
-           list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")),
-           list(NULL)) +
-    scale_fill_palette_c(Color_report) +
-    scale_y_continuous(expand = expansion(mult=0.1)) +
-    scale_x_continuous(expand = expansion(mult=0.1)) +
-    coord_sf(crs = CRS_Layer, datum = CRS_Layer, clip = "off") +
-    theme(axis.text.y = element_text(angle=90, hjust=.5),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
+#   var1.pred <- getValues(MASK_PRED)
+#   coords = raster::xyFromCell(MASK_PRED, seq_len(ncell(MASK_PRED)))
+#   MASK_PRED_DF = data.frame(coords, var1.pred)
+# #   MASK_PRED_DF =MASK_PRED_DF[!is.na(MASK_PRED_DF$var1.pred),]
+# 
+#   show_l = ifelse(is.null(Mask_layer), FALSE, TRUE)
+#   p5 = ggplot() +
+#     theme_bw() +
+#     geom_tile(data = MASK_PRED_DF , aes(x = x, y = y, fill = var1.pred), na.rm = T, show.legend = show_l) +
+#     ifelse(is.null(Mask_layer),
+#          list(geom_sf(data=poly_crop, fill=NA, color="white", show.legend = show_l)),
+#          list(geom_sf(data=poly_crop, fill=NA, linewidth=.5))
+#          ) +
+#     ifelse(Insert_points,
+#            list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")),
+#            list(NULL)) +
+#     scale_fill_gradientn(colors = Color_ramp_report, na.value = NA, limits = c(min_pred,max_pred)) +
+# #     scale_fill_palette_c(Color_ramp_report) +
+#     scale_y_continuous(expand = expansion(mult=0.1)) +
+#     scale_x_continuous(expand = expansion(mult=0.1)) +
+#     coord_sf(crs = CRS_Layer, datum = CRS_Layer, clip = "off") +
+#     theme(axis.text.y = element_text(angle=90, hjust=.5),
+#           panel.grid.minor = element_blank(),
+#           panel.background = element_rect(fill = 'white')
+#           ) +
+#     labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
 
   # =========================================================================
   # Calculating the Sturges bins
@@ -105,7 +131,7 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw(12) +
     geom_histogram(color = "black", fill = "azure3", breaks = breaks) +
     scale_y_continuous(limits = c(0,NA), expand = expansion(mult=c(0,0.1))) +
-    scale_x_continuous() +#(breaks = breaks) +
+    scale_x_continuous() +
     theme(panel.grid.minor = element_blank(), plot.title = element_text(size = 12)) +
     geom_vline(xintercept = ST[['mean_error_res']], color="red", linetype = 2) +
     labs(x="Residual", y="Count", title="Histogram")
@@ -124,7 +150,8 @@ create_report = function(cr = TRUE, or = FALSE)
     theme_bw(12) +
     geom_point(aes(fill = residual, size = residual), alpha=.5, shape=21) +
     scale_size_area(max_size = 8) +
-    scale_fill_palette_c(Color_report) +
+    scale_fill_gradientn(colors = Color_ramp_report, na.value = NA) +
+#     scale_fill_palette_c(Color_ramp_report) +
     guides(fill = guide_legend(), size = guide_legend()) +
     theme(plot.title = element_text(size = 12),
           legend.title = element_blank(),
@@ -141,7 +168,7 @@ create_report = function(cr = TRUE, or = FALSE)
 
   g1 = plot_grid(a1,a2,a3,a4)
 
-  title_ = fpar(ftext("Ordinary Kriging Interpolation", prop = shortcuts$fp_bold(font.size = 15)))
+  title_ = fpar(ftext(tit, prop = shortcuts$fp_bold(font.size = 15)))
   txt_open = fpar(run_linebreak(), "")
   txt_crossvalidation = fpar("", run_linebreak())
   txt_variogram = fpar("", run_linebreak())
@@ -174,7 +201,7 @@ create_report = function(cr = TRUE, or = FALSE)
   cap_fig_p2 = paste("Final result of interpolation, the prediction map.")
   cap_fig_p3 = "Final result of interpolation, the variance or error map."
   cap_fig_p4 = paste("Variogram Cloud -", Field)
-  cap_fig_p5 = paste("Clip kriging -", Field)
+#   cap_fig_p5 = paste("Clip kriging -", Field)
 
   run_num = run_autonum(seq_id = "fig", pre_label = "Figure ", bkm = "figure")
   run_num_table = run_autonum(seq_id = "tab", pre_label = "Table ", bkm = "table")
@@ -188,6 +215,9 @@ create_report = function(cr = TRUE, or = FALSE)
     body_add(title_) |>
     body_add(value = txt_open, style = "Normal") |>
     body_add(value = capture.output(printInfo()), style = "Normal") |>
+
+    body_add_break() |>
+
     body_add_par(value = "Stats", style = "heading 1") |>
     body_add_par(value = run_linebreak(), style = "Normal") |>
     body_add_caption(value = block_caption(cap_table_model, style = "Normal", autonum = run_num_table)) |>
@@ -232,12 +262,12 @@ create_report = function(cr = TRUE, or = FALSE)
 
     body_add_break() |>
 
-    body_add_par(value = "Clip Ordinary Kriging simulation", style = "heading 1") |>
-    body_add(value = txt_kriging_clip, style = "Normal") |>
-    body_add_gg(value = p5, width = 6.3, height = 6.3, res=150) |>
-    body_add_caption(value = block_caption(cap_fig_p5, style = "Normal", autonum = run_num)) |>
-
-    body_add_break() |>
+#     body_add_par(value = "Clip Ordinary Kriging simulation", style = "heading 1") |>
+#     body_add(value = txt_kriging_clip, style = "Normal") |>
+#     body_add_gg(value = p5, width = 6.3, height = 6.3, res=150) |>
+#     body_add_caption(value = block_caption(cap_fig_p5, style = "Normal", autonum = run_num)) |>
+# 
+#     body_add_break() |>
 
 #     body_add_par(value = "Warnings", style = "heading 1") |>
 #     body_add(value =  cap, style = "Normal") |>
@@ -248,6 +278,6 @@ create_report = function(cr = TRUE, or = FALSE)
   print(doc, target = Report)
   if(or) browseURL(Report)
 
-  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4, p5=p5, g1=g1)))
+  return(invisible(list(p1=p1, p2=p2, p3=p3, p4=p4, g1=g1)))
 }
 
