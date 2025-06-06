@@ -39,6 +39,7 @@ plot_variogram = function(vg, fit.vgm, model = NULL)
     )
   }
 
+  Color_ramp_report = palette_colors(name = Color_Ramp_Report, n = 100, reverse = Invert_Color_Ramp)
   colores = c("#CDB79E", "#A52A2A", "#FF8C00", "#008B00", "black")
   leg_colors = if(length(fit.vgm$model) < 2) colores[c(1,3,4,5)] else colores
 

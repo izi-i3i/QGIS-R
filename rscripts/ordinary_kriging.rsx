@@ -45,20 +45,24 @@
 #'         : In blank the number generation is random.
 #' Create_Report: Create report with graphs.
 #' Open_Report: Open report.
-#' Color_Ramp_Report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma, viridis, Cividis, Rocket, Mako.
-#' N_colors: Number of color ramp.
+#' Color_Ramp_Report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma,
+#'                  : Viridis, Cividis, Rocket, Mako, Regions.
 #' Invert_Color_Ramp: Invert color ramp.
 #' Draw_lines_variogram: Draw lines variogram.
+#' Plot_mask: Plot layer mask.
 #' Report: Directory and name of the report (docx) to be saved.
+#' Plot_contour_report: Plot contour report.
+#' Mask_conf_report: size = 0.3, color = 'gray60'.
+#' Contour_conf_report: size = 0.5, color = 'gray50'.
 #' rscripts_folder: path to rscript folder.
 #' OK_variance: Kriging variance of prediction (raster)
 #' OK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.1.0
+#' ALG_VERSION: 0.1.1
 
 ##Ordinary Kriging=name
-##[R-Geostatistics]=group
+##[QGIS-R 2025-0.1.0]=group
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3857
 ##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer|2|None|True
@@ -85,19 +89,28 @@
 ##Create_Report=boolean True
 ##Open_Report=boolean False
 ##Color_Ramp_Report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako;Regions ;
-##Invert_Color_Ramp=boolean False
-##Insert_points=boolean True
-##Draw_lines_variogram=boolean False
-##Report=output file docx
+##QgsProcessingParameterBoolean|Invert_Color_Ramp|Invert color ramp (Report)|False
+##QgsProcessingParameterBoolean|Insert_points|Insert points (Report)|True
+##QgsProcessingParameterBoolean|Draw_lines_variogram|Draw lines variogram (Report)|False
+##QgsProcessingParameterBoolean|Plot_mask|Plot mask (Report)|True
+##QgsProcessingParameterBoolean|Plot_contour_report|Plot contour (Report)|False
+##QgsProcessingParameterString|Mask_conf_report|Mask conf (Report)|size = 0.3, color = 'gray60'
+##QgsProcessingParameterString|Contour_conf_report|Contour_conf (Report)|size = 0.5, color = 'gray50'
 ##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
+
+##Report=output file docx
 ##OK_variance=output raster
 ##OK_prediction=output raster
 
 # ter 03 jun 2025 20:12:05
 #-----------------------------------------------
 
+# =========================================================================
+arquivo = "ordinary_kriging.rsx"
+pattern = "\\.rsx$"
+
 # OPTIONS =================================================================
-options(scipen = 9999) # scientific notation
+options(scipen = 999) # scientific notation
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster",
@@ -113,8 +126,6 @@ for (pac in packages) {
 }
 
 # DIR QGIS3 ===============================================================
-if(!dir.exists(rscripts_folder))
-  stop(sprintf("\nFolder path ('%s') does not exist!", rscripts_folder), call. = FALSE)
 
 file_path = file.path(getwd(), ".rscript_path")
 
@@ -132,6 +143,9 @@ if (!file.exists(file_path))
   fileConn<-file(".rscript_path")
   writeLines(dir_path, fileConn)
   close(fileConn)
+  novo = TRUE
+} else {
+  novo = FALSE
 }
 
 if (file.exists(file_path) & rscripts_folder != "")
@@ -144,15 +158,24 @@ if (file.exists(file_path) & rscripts_folder != "")
     writeLines(dir_path, fileConn)
     close(fileConn)
   }
-} else if (file.exists(file_path)) {
-    dir_path = dir_path_aux = readLines(file_path)
-  } else {
+} else if (novo) {
     dir_path_aux = rscripts_folder
     dir_path = readLines(file_path)
+  } else {
+    dir_path = readLines(file_path)
+    t1 = "##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1|||True"
+    list_files = list.files(dir_path, pattern = pattern, recursive = TRUE, full.names = TRUE)
+    arq = grep(paste0(arquivo, collapse="|"), list_files, value = TRUE)
+    txt = readLines(arq)
+    t2 = grep(t1, txt, fixed = TRUE)
+    dir_path_aux = if (txt[t2[1]] == t1) "" else dir_path
 }
 
 if(!dir.exists(dir_path))
   stop(sprintf("\nFolder path ('%s') does not exist!", dir_path), call. = FALSE)
+
+
+
 
 # READ FUNCTIONS ==========================================================
 sourceFun = function(x, path, ...)
@@ -164,7 +187,6 @@ sourceFun = function(x, path, ...)
   cat("\nLoading required function files:\n")
   cat("----------------------------------\n")
   cat(x, sep="\n")
-  cat("----------------------------------\n\n")
 }
 
 fun = c("get_grid.R",
@@ -176,33 +198,16 @@ fun = c("get_grid.R",
         "is_crs_planar",
         "get_stats.R",
         "printInfo.R",
-        "order_magnitude.R")
+        "order_magnitude.R",
+        "palette_colors.R")
 sourceFun(fun, path = dir_path, trace = TRUE)
 
 # CHANGE DIR ==============================================================
-change_dir("ordinary_kriging.rsx", dir_path, dir_path_aux, pattern="\\.rsx$")
+change_dir(arquivo, dir_path, dir_path_aux, pattern=pattern)
 
 # SEED ====================================================================
 if(Set_Seed == "") Set_Seed = NULL
 set.seed(Set_Seed)
-
-# COLOR ===================================================================
-N_colors = 100
-reverse = if(Invert_Color_Ramp) -1 else 1
-Colors = list(
-      "Spectral" = hcl.colors(N_colors, palette = "Spectral"),
-      "Inferno"  = hcl.colors(N_colors, palette = "Inferno"),
-      "Plasma"   = hcl.colors(N_colors, palette = "Plasma"),
-      "Viridis"  = hcl.colors(N_colors, palette = "Viridis"),
-      "Cividis"  = hcl.colors(N_colors, palette = "Cividis"),
-      "Rocket"   = hcl.colors(N_colors, palette = "Rocket"),
-      "Mako"     = hcl.colors(N_colors, palette = "Mako"),
-      "Turbo"    = viridis(N_colors, option = "turbo"),
-      "Magma"    = viridis(N_colors, option = "magma"),
-      "Regions"  = sp::get_col_regions()
-      )
-# sort(hcl.pals())
-Color_ramp_report = if(reverse == 1) Colors[[Color_Ramp_Report]] else rev(Colors[[Color_Ramp_Report]])
 
 # LAYER CRS-TRANSFORM =================================
 if (is_crs_planar(Layer))
@@ -245,7 +250,7 @@ raster::crs(LAYER) <- raster::crs(CRS_Layer)
 names(LAYER)[names(LAYER) == Field] = "Field"
 LAYER = remove.duplicates(LAYER)
 LAYER = LAYER[!is.na(LAYER$Field),]
-# if(is.character(LAYER$Field)) LAYER$Field = as.numeric(as.character(LAYER$Field))
+if(is.character(LAYER$Field)) stop("Field must be numeric!", call. = FALSE)
 
 if(Log_Field)
 {
@@ -260,6 +265,7 @@ model1 = c("Sph", "Exp", "Gau",
           "Pen", "Per", "Wav",
           "Hol", "Log", "Spl",
           "Pow", "Nug")
+
 model = model1[sort(Model+1)]
 
 model_type = c("Spherical (Sph)", "Exponential (Exp)", "Gaussian (Gau)",
@@ -390,6 +396,7 @@ if (!is.null(Mask_layer))
   PRED_RASTER = raster::mask(PRED_RASTER, mask_crop)
   VAR_RASTER = raster::mask(VAR_RASTER, mask_crop)
 }
+
 # OUT RASTER ==========================================
 OK_variance = VAR_RASTER
 OK_prediction = PRED_RASTER
@@ -400,16 +407,38 @@ if(N_fold < 2) N_fold = nrow(LAYER@data)
 
 # Cross validation functions
 KCV = krige.cv(frm, LAYER, var_model, nmax = Maximum, nfold = N_fold, verbose = FALSE)
-KCV_DF = as.data.frame(KCV)
 
-ST = get_stats(KCV)
-STAT = ST[['stats']]
 
 # INFO ================================================
 printInfo()
 
+# CONTOUR =================================================================
+if(Plot_contour_report)
+{
+  CONTOUR = rasterToContour(PRED_RASTER)
+  contour_lines = st_as_sf(CONTOUR)
+} else {
+  contour_lines = NULL
+}
+
 # REPORT ==============================================
-rp = create_report(Create_Report, Open_Report, tit = "Ordinary Kriging Interpolation")
+Mask_conf_report_list = eval(str2lang((paste("list(", Mask_conf_report, ")"))))
+Contour_conf_report_list = eval(str2lang((paste("list(", Contour_conf_report, ")"))))
+
+contour_lines = if(Plot_contour_report) OK_contour else NULL
+
+rp = create_report(tit = "Ordinary Kriging Interpolation",
+                   PRED_RASTER,
+                   VAR_RASTER,
+                   KCV,
+                   Create_Report,
+                   Open_Report,
+                   plot.mask = Plot_mask,
+                   contour.lines = contour_lines,
+                   mask.conf = Mask_conf_report_list,
+                   contour.conf = Contour_conf_report_list,
+                   color_ramp = palette_colors(name = Color_Ramp_Report, n = 100, reverse = Invert_Color_Ramp)
+                   )
+
 
 # ---------------------------------
-

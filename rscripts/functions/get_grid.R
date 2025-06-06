@@ -40,13 +40,13 @@ get_grid = function (x,
 
   rect_pol = function()
   {
-    #   (x1,y2)--------------(x2,y2)
-    #      |                    |
-    #      |                    |
-    #      |                    |
-    #      |                    |
-    #      |                    |
-    #   (x1,y1)--------------(x2,y1)
+    #   (x1,y2)-----------(x2,y2)
+    #      |                 |
+    #      |                 |
+    #      |                 |
+    #      |                 |
+    #      |                 |
+    #   (x1,y1)-----------(x2,y1)
     pol = c(x2, x1, x1, x2, x2,
             y2, y2, y1, y1, y2)
     coord_matrix = matrix(pol, ncol=2, nrow=5)
@@ -62,8 +62,8 @@ get_grid = function (x,
              warning("polygon is NULL, grid.method coerced to Rectangle", call. = FALSE)
            } else {
              st_agr(mask.layer) = "constant"
-             mask.l = st_crop(mask.layer, xmin=x1, ymin=y1, xmax=x2, ymax=y2)
-             d = as(mask.l, "Spatial")
+             mask_layer = st_crop(mask.layer, xmin=x1, ymin=y1, xmax=x2, ymax=y2)
+             d = as(mask_layer, "Spatial")
            }
          },
          'Rectangle' = {

@@ -15,15 +15,16 @@ change_dir = function(arq, dir_path, dir_path_aux, pattern = "\\.rsx$")
 
   if (new_dir != old_dir)
   {
-    fp = find_file(arq, dir_path, pattern = pattern)
+    list_files = list.files(dir_path, pattern = pattern, recursive = TRUE, full.names = TRUE)
+    fp = grep(paste0(arq, collapse="|"), list_files, value = TRUE)
+#     fp = find_file(arq, dir_path, pattern = pattern)
     txt = readLines(fp)
     txt[txt == old_dir] <- new_dir
 
     fileConn = file(fp)
     writeLines(txt, fileConn)
     close(fileConn)
-    cat("\n ----------------------------------\n")
-    cat("  Path to rscript folder - Updated!\n")
-    cat(" ----------------------------------\n\n")
+    cat(" ----------------------------------\n")
+    cat("  Path to rscript folder - Updated!\n\n")
   }
 }
