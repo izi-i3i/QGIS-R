@@ -96,7 +96,7 @@
 ##QgsProcessingParameterBoolean|Plot_contour_report|Plot contour (Report)|False
 ##QgsProcessingParameterString|Mask_conf_report|Mask conf (Report)|size = 0.3, color = 'gray60'
 ##QgsProcessingParameterString|Contour_conf_report|Contour_conf (Report)|size = 0.5, color = 'gray50'
-##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
+##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1|||True
 
 ##Report=output file docx
 ##OK_variance=output raster
