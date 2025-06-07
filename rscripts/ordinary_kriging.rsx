@@ -99,8 +99,8 @@
 ##QgsProcessingParameterBoolean|Plot_contour_report|Plot contour (Report)|False
 ##QgsProcessingParameterString|Mask_conf_report|Mask conf (Report)|size = 0.3, color = 'gray60'
 ##QgsProcessingParameterString|Contour_conf_report|Contour_conf (Report)|size = 0.5, color = 'gray50'
-##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (only rectangle)|QgsProcessingParameterNumber.Double|0.02
-##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (only rectangle)|QgsProcessingParameterNumber.Double|0.02
+##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (Report)|QgsProcessingParameterNumber.Double|0.02
+##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (Report)|QgsProcessingParameterNumber.Double|0.02
 ##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 
 ##Report=output file docx
