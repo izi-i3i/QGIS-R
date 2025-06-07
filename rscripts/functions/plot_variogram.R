@@ -5,8 +5,10 @@
 # License :
 # Updated :
 #-------------------------------------------
-plot_variogram = function(vg, fit.vgm, model = NULL)
-{
+plot_variogram = function(vg, fit.vgm,
+                          model = NULL,
+                          color.ramp = palette_colors()
+){
   preds = variogramLine(fit.vgm, maxdist = max(vg$dist))
   breaks = pretty(range(vg$np), n = nclass.Sturges(vg$np)-1, min.n = 1)
 
@@ -39,7 +41,7 @@ plot_variogram = function(vg, fit.vgm, model = NULL)
     )
   }
 
-  Color_ramp_report = palette_colors(name = Color_Ramp_Report, n = 100, reverse = Invert_Color_Ramp)
+  
   colores = c("#CDB79E", "#A52A2A", "#FF8C00", "#008B00", "black")
   leg_colors = if(length(fit.vgm$model) < 2) colores[c(1,3,4,5)] else colores
 
@@ -53,8 +55,8 @@ plot_variogram = function(vg, fit.vgm, model = NULL)
     scale_color_manual(values = leg_colors) +
     geom_text_repel(aes(label = np)) +
     scale_y_continuous(limits = c(0, NA)) +
-    scale_fill_gradientn(colors = Color_ramp_report, na.value = NA) +
-#     scale_fill_palette_c(Color_ramp_report) +
+    scale_fill_gradientn(colors = color.ramp, na.value = NA) +
+#     scale_fill_palette_c(color.ramp) +
     guides(fill = guide_legend(order=0), size = guide_legend(order=0), color = guide_legend()) +
     labs(x = "distance", y = "semivariance", fill = "n point pairs", color = "")
 

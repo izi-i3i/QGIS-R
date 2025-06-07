@@ -54,6 +54,8 @@
 #' Plot_contour_report: Plot contour report.
 #' Mask_conf_report: size = 0.3, color = 'gray60'.
 #' Contour_conf_report: size = 0.5, color = 'gray50'.
+#' Expand_longitude: value added to longitude.
+#' Expand_latitude: value added to latitude.
 #' rscripts_folder: path to rscript folder.
 #' OK_variance: Kriging variance of prediction (raster)
 #' OK_prediction: Kriging predicted value (raster)
@@ -72,7 +74,7 @@
 ##CRS_Extent=expression @project_crs
 ##qgis_version=expression @qgis_version
 
-##Grid_method=enum literal Rectangle;Convex hull ;
+##Grid_method=enum literal Rectangle;Convex hull;Polygon ;
 ##Block_size=string "0"
 ##Model=enum multiple Spherical (Sph);Exponential (Exp);Gaussian (Gau);Matern (Mat); Matern Stein's parameterization (Ste);Exponential class (Exc);Circular (Cir);Linear (Lin);Bessel (Bes);Pentaspherical (Pen);Periodic (Per);Wave (Wave);Hole (Hol);Logarithmic (Log);Spline (Spl);Power (Pow);Nugget (Nug)
 ##Auto_fit_variogram=boolean True
@@ -96,7 +98,9 @@
 ##QgsProcessingParameterBoolean|Plot_contour_report|Plot contour (Report)|False
 ##QgsProcessingParameterString|Mask_conf_report|Mask conf (Report)|size = 0.3, color = 'gray60'
 ##QgsProcessingParameterString|Contour_conf_report|Contour_conf (Report)|size = 0.5, color = 'gray50'
-##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1|||True
+##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (Report)|QgsProcessingParameterNumber.Double|0.02
+##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (Report)|QgsProcessingParameterNumber.Double|0.02
+##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 
 ##Report=output file docx
 ##UK_variance=output raster
@@ -105,25 +109,33 @@
 # qui 05 jun 2025 22:27:50
 #-----------------------------------------------
 
-# =========================================================================
+# ======================================================
 arquivo = "universal_kriging.rsx"
 pattern = "\\.rsx$"
 
-# OPTIONS =================================================================
+# OPTIONS ==============================================
 options(scipen = 9999) # scientific notation
 
-# READ PACKAGES ====================================
-packages = c("gstat", "sp", "sf", "automap", "raster", "ggrepel", "palettes","paletteer",
-             "officer", "cowplot", "viridis", "ggpmisc", "ggplot2")
+# SEED =================================================
+if(Set_Seed == "") Set_Seed = NULL
+set.seed(Set_Seed)
 
-for (pac in packages) {
-  if (!suppressMessages(require(pac, character.only=TRUE, quietly=TRUE))) {
-    install.packages(pac, repos = "https://cloud.r-project.org", dependencies=TRUE)
+# READ PACKAGES ========================================
+packages = c("gstat", "sp", "sf", "automap", "raster",
+             "paletteer", "palettes", "viridis",
+             "officer", "cowplot", "ggrepel",
+             "ggpmisc", "ggplot2")
+
+for (pac in packages)
+{
+  if (!suppressMessages(require(pac, character.only = TRUE, quietly = TRUE)))
+  {
+    install.packages(pac, repos = "https://cloud.r-project.org", dependencies = TRUE)
     cat("package installed:", paste(pac, collapse = ", "),"\n")
   }
 }
 
-# DIR QGIS3 ===============================================================
+# DIR QGIS3 ============================================
 file_path = file.path(getwd(), ".rscript_path")
 
 if (!file.exists(file_path))
@@ -137,7 +149,7 @@ if (!file.exists(file_path))
     dir_path = "~/Library/Application\\ Support/QGIS/QGIS3"
   }
 
-  fileConn<-file(".rscript_path")
+  fileConn <- file(".rscript_path")
   writeLines(dir_path, fileConn)
   close(fileConn)
   novo = TRUE
@@ -147,11 +159,11 @@ if (!file.exists(file_path))
 
 if (file.exists(file_path) & rscripts_folder != "")
 { # file=exists; folder=non-empty
-  dir_path <- rscripts_folder
-  dir_path_aux <- readLines(file_path)
+  dir_path = rscripts_folder
+  dir_path_aux = readLines(file_path)
   if (dir_path != dir_path_aux)
-  {
-    fileConn<-file(".rscript_path")
+  { #write new path
+    fileConn = file(".rscript_path")
     writeLines(dir_path, fileConn)
     close(fileConn)
   }
@@ -162,91 +174,87 @@ if (file.exists(file_path) & rscripts_folder != "")
     dir_path = readLines(file_path)
     t1 = "##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1|||True"
     list_files = list.files(dir_path, pattern = pattern, recursive = TRUE, full.names = TRUE)
-    arq = grep(paste0(arquivo, collapse="|"), list_files, value = TRUE)
+    arq = grep(paste0(arquivo, collapse = "|"), list_files, value = TRUE)
     txt = readLines(arq)
     t2 = grep(t1, txt, fixed = TRUE)
     dir_path_aux = if (txt[t2[1]] == t1) "" else dir_path
 }
 
 if(!dir.exists(dir_path))
-  stop(sprintf("\nFolder path ('%s') does not exist!", dir_path), call. = FALSE)
+{
+  stop(sprintf("\nFolder path ('%s') does not exist!\nEnter a valid path in: 'Path to rscript folder'",
+               dir_path), call. = FALSE)
+}
 
-
-# READ FUNCTIONS ==========================================================
-sourceFun = function(x, path, ...)
+# READ FUNCTIONS =======================================
+sourceFun = function(x, path)
 {
   list_files = list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
-  arq = grep(paste0(x, collapse="|"), list_files, value = TRUE)
+  arq = grep(paste0(x, collapse = "|"), list_files, value = TRUE)
   for (i in 1:length(arq)) { source(arq[i]) }
-#   cat("", dirname(arq[i]), "\n")
   cat("\nLoading required function files:\n")
   cat("----------------------------------\n")
   cat(x, sep="\n")
-  cat("----------------------------------\n\n")
 }
 
 fun = c("get_grid.R",
         "plot_variogram.R",
         "create_report.R",
         "change_dir.R",
-        "find_file.R",
         "round_df.R",
         "is_crs_planar",
         "get_stats.R",
         "printInfo.R",
         "order_magnitude.R",
-        "palette_colors.R")
-sourceFun(fun, path = dir_path, trace = TRUE)
+        "palette_colors.R",
+        "crs_txt.R")
 
-# CHANGE DIR ============================================
-change_dir(arquivo, dir_path, dir_path_aux, pattern=pattern)
+# Loading required function
+sourceFun(fun, path = dir_path)
 
-# SEED ==================================================
-if(Set_Seed == "") Set_Seed = NULL
-set.seed(Set_Seed)
+# CHANGE DIR ===========================================
+change_dir(arquivo, dir_path, dir_path_aux, pattern = pattern)
 
-# LAYER CRS-TRANSFORM =================================
+# LAYER CRS-TRANSFORM ==================================
 if (is_crs_planar(Layer))
 {
   CRS_Layer = raster::crs(Layer)
 } else {
-  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
-  Layer = st_transform(Layer, crs = CRS_Layer, agr = "constant")
+  Mask_layer = st_transform(Mask_layer, crs = CRS_Layer, agr = "constant")
 }
 
-# EXTRACT CRS LAYER ===================================
-crs_info = st_crs(Layer)
-crs_num = crs_info$epsg
+if(!is.null(Mask_layer)) Mask_layer = st_transform(Mask_layer, crs = CRS_Layer)
 
-if (!is_crs_planar(Layer))
-  stop(
-    sprintf("CRS_Layer ('%s') is not a planar coordinate!\nChange to a planar coordinate, example EPSG:3857.",
-            crs_num), call. = FALSE)
-
-# INFO ============================================
-crs_proj = st_crs(st_sfc(crs = crs_num))
-epsg_crs_txt = paste0("CRS - ", "EPSG:", crs_num, " ", crs_proj$Name)
-
-# EXTENT ===========================================
+# EXTENT ===============================================
 if(is.null(Extent))
 {
   Extent = extent(st_bbox(Layer))
 } else {
-  xy = data.frame(x=Extent[1:2], y=Extent[3:4])
+  xy = data.frame(x = Extent[1:2], y = Extent[3:4])
   L1 = st_as_sf(xy, coords = c("x", "y"), crs = CRS_Extent, agr = "constant")
-  L2 = st_transform(L1, crs = raster::crs(CRS_Layer), agr = "constant")
+  L2 = st_transform(L1, crs = st_crs(CRS_Layer), agr = "constant")
   Extent = extent(st_bbox(L2))
 }
 
-# LAYER ============================================
+# MASK LAYER NULL ======================================
+if (is.null(Mask_layer) & (Grid_method == "Polygon" | Grid_method == "Convex hull"))
+{
+  st_agr(Layer) = "constant"
+  Layer = st_crop(Layer, Extent)
+  Mask_layer <- st_as_sf(st_convex_hull(st_union(Layer)), crs = CRS_Layer)
+
+  warning("Mask_layer is NULL, grid.method coerced to 'Convex hull'", call. = FALSE)
+}
+
+# LAYER ================================================
 LAYER = as_Spatial(Layer)
-LAYER = crop(LAYER, Extent)
+LAYER = raster::crop(LAYER, Extent)
 raster::crs(LAYER) <- raster::crs(CRS_Layer)
 
 names(LAYER)[names(LAYER) == Field] = "Field"
 LAYER = remove.duplicates(LAYER)
 LAYER = LAYER[!is.na(LAYER$Field),]
-# if(is.character(LAYER$Field)) LAYER$Field = as.numeric(as.character(LAYER$Field))
+if(is.character(LAYER$Field)) stop("Field must be numeric!", call. = FALSE)
 
 if(Log_Field)
 {
@@ -254,13 +262,14 @@ if(Log_Field)
   Field = paste0("log(", Field,")")
 }
 
-# SELECT MODEL =====================================
+# SELECT MODEL =========================================
 model1 = c("Sph", "Exp", "Gau",
            "Mat", "Ste", "Exc",
            "Cir", "Lin", "Bes",
            "Pen", "Per", "Wav",
            "Hol", "Log", "Spl",
            "Pow", "Nug")
+
 model = model1[sort(Model+1)]
 
 model_type = c("Spherical (Sph)", "Exponential (Exp)", "Gaussian (Gau)",
@@ -269,6 +278,7 @@ model_type = c("Spherical (Sph)", "Exponential (Exp)", "Gaussian (Gau)",
                "Pentaspherical (Pen)", "Periodic (Per)", "Wave (Wave)",
                "Hole (Hol)", "Logarithmic (Log)", "Spline (Spl)",
                "Power (Pow)", "Nugget (Nug)")
+
 names(model_type) <- model1
 mt_select = model_type[sort(Model+1)]
 
@@ -294,7 +304,7 @@ if(ln > 15 | sum(pn) > 0)
   }
 }
 
-# VARIOGRAM ========================================
+# VARIOGRAM ============================================
 form = 'Field ~ x + y'
 frm = formula(form)
 gs = gstat(formula = frm, data = LAYER)
@@ -354,17 +364,26 @@ Block_size = unlist(strsplit(Block_size, ","))
 Block_size = tryCatch(abs(as.integer(Block_size)), warning = function(w) {0})#NOTE: verificar
 
 # AUTOMATIC RESOLUTION =================================
-kr = if(any(Block_size > 0)) 150 else 400
-
-# resolution
 Resolution = tryCatch(abs(as.integer(Resolution)),
     warning = function(w) {
-      round(sqrt((Extent[2] - Extent[1])^2 + (Extent[4] - Extent[3])^2)/kr)
+      a = (Extent[2] - Extent[1])^2
+      b = (Extent[4] - Extent[3])^2
+      hyp = sqrt(a + b)
+      kr = if(any(Block_size > 0)) 250 else 500
+      Resolution = as.integer(hyp/kr)
+      if(order_magnitude(hyp)[2] > 100000) Resolution = as.integer(Resolution * 1.5)
+      if(order_magnitude(hyp)[2] > 1000000) Resolution = as.integer(Resolution * 2.5)
+      Resolution
     })
 
 # GRID =================================================
-GRIDE = get_grid(LAYER, extent = Extent, mask.layer = Mask_layer,
-                 resolution = Resolution, grid.method = Grid_method)
+GRIDE = get_grid(LAYER,
+                 extent = Extent,
+                 mask.layer = Mask_layer,
+                 resolution = Resolution,
+                 grid.method = Grid_method,
+                 fx = 0.01,
+                 fy = 0.01)
 
 # TRANSFORM STRING (Maximum) INTO NUMERIC ==============
 Maximum = tryCatch(abs(as.numeric(Maximum)), warning = function(w) { Inf })
@@ -383,51 +402,35 @@ VAR_RASTER = raster(UK[2])
 if (!is.null(Mask_layer))
 {
   st_agr(Mask_layer) = "constant"
-  mask_crop = st_crop(Mask_layer, Extent)
-  PRED_RASTER = raster::mask(PRED_RASTER, mask_crop)
-  VAR_RASTER = raster::mask(VAR_RASTER, mask_crop)
+  Mask_layer = st_crop(Mask_layer, Extent)
+  PRED_RASTER = raster::mask(PRED_RASTER, Mask_layer)
+  VAR_RASTER = raster::mask(VAR_RASTER, Mask_layer)
 }
 
 # OUT RASTER ===========================================
 UK_variance = VAR_RASTER
 UK_prediction = PRED_RASTER
 
-# CROSS VALIDATION =====================================
-# if larger than 1, then apply n-fold cross validation
-if(N_fold < 2) N_fold = nrow(LAYER@data)
-
-# Cross validation functions
-KCV = krige.cv(frm, LAYER, var_model, nmax = Maximum, nfold = N_fold, verbose = FALSE)
-
-# INFO ===============================================
+# INFO =================================================
 printInfo()
 
-# CONTOUR =================================================================
-if(Plot_contour_report)
-{
-  CONTOUR = rasterToContour(PRED_RASTER)
-  contour_lines = st_as_sf(CONTOUR)
-} else {
-  contour_lines = NULL
-}
-
-# REPORT ==============================================
-Mask_conf_report_list = eval(str2lang((paste("list(", Mask_conf_report, ")"))))
-Contour_conf_report_list = eval(str2lang((paste("list(", Contour_conf_report, ")"))))
-
-contour_lines = if(Plot_contour_report) OK_contour else NULL
-
+# REPORT ===============================================
 rp = create_report(tit = "Universal Kriging Interpolation",
+                   LAYER,
                    PRED_RASTER,
                    VAR_RASTER,
-                   KCV,
-                   Create_Report,
-                   Open_Report,
+                   mask.layer = Mask_layer,
+                   var.model = var_model,
+                   n.fold = N_fold,
+                   create.report = Create_Report,
+                   open.report = Open_Report,
                    plot.mask = Plot_mask,
-                   contour.lines = contour_lines,
-                   mask.conf = Mask_conf_report_list,
-                   contour.conf = Contour_conf_report_list,
-                   color_ramp = palette_colors(name = Color_Ramp_Report, n = 100, reverse = Invert_Color_Ramp)
+                   plot.contour = Plot_contour_report,
+                   mask.conf = Mask_conf_report,
+                   contour.conf = Contour_conf_report,
+                   color.ramp = palette_colors(name = Color_Ramp_Report, n = 100, reverse = Invert_Color_Ramp),
+                   fx = Expand_longitude,
+                   fy = Expand_latitude
                    )
 
 # ---------------------------------

@@ -14,7 +14,7 @@ get_grid = function (x,
                      fx = 0.01,
                      fy = 0.01
 ){
-  if(class(x)[1]=="sf") x = as_Spatial(x)
+  if(class(x)[1] == "sf") x = as_Spatial(x)
   grid.method = match.arg(grid.method)
 
   if(is.null(extent))
@@ -49,22 +49,16 @@ get_grid = function (x,
     #   (x1,y1)-----------(x2,y1)
     pol = c(x2, x1, x1, x2, x2,
             y2, y2, y1, y1, y2)
-    coord_matrix = matrix(pol, ncol=2, nrow=5)
-    rp = SpatialPolygons(list(Polygons(list(Polygon(coords = coord_matrix)), ID=1)))
+    coord_matrix = matrix(pol, ncol = 2, nrow = 5)
+    rp = SpatialPolygons(list(Polygons(list(Polygon(coords = coord_matrix)), ID = 1)))
     rp
   }
 
   switch(grid.method,
          'Polygon' = {
-           if(is.null(mask.layer))
-           {
-             d = rect_pol()
-             warning("polygon is NULL, grid.method coerced to Rectangle", call. = FALSE)
-           } else {
              st_agr(mask.layer) = "constant"
-             mask_layer = st_crop(mask.layer, xmin=x1, ymin=y1, xmax=x2, ymax=y2)
+             mask_layer = st_crop(mask.layer, xmin = x1, ymin = y1, xmax = x2, ymax = y2)
              d = as(mask_layer, "Spatial")
-           }
          },
          'Rectangle' = {
            d = rect_pol()
@@ -76,7 +70,7 @@ get_grid = function (x,
            d = Polygon(ch)
          })
 
-  gride = spsample(d, n=1, cellsize=c(resolution,resolution), type="regular", pretty = FALSE)
+  gride = spsample(d, n=1, cellsize=c(resolution,resolution), type = "regular", pretty = FALSE)
 
   attr(gride@coords, "dimnames")[[2]] <- c("x", "y")
   attr(gride@bbox, "dimnames")[[1]] <- c("x", "y")

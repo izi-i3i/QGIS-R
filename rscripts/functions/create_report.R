@@ -5,132 +5,123 @@
 # Updated     :
 #-------------------------------------------
 create_report = function(tit = "Kriging Interpolation",
+                         LAYER,
                          PRED_RASTER,
                          VAR_RASTER,
-                         KCV,
+                         mask.layer,
+                         var.model,
+                         n.fold,
                          create.report = TRUE,
                          open.report = TRUE,
                          plot.mask = FALSE,
-                         contour.lines = NULL,
+                         plot.contour = FALSE,
                          mask.conf = list(size = 0.3, color = "gray60"),
                          contour.conf = list(size = 0.5, color = "gray50"),
-                         color_ramp = palette_colors("Spectral", n = 100, reverse = FALSE)
+                         color.ramp = palette_colors(),
+                         fx = 0.02,
+                         fy = 0.02
 ){
   if(!create.report) return(NULL)
 
-  # PLOT VARIOGRAM ========================================
-  pv1 = plot_variogram(vg, var_model, Model)
+  # =========================================================================
+  mask.conf = eval(str2lang((paste("list(", mask.conf, ")"))))
+  contour.conf = eval(str2lang((paste("list(", contour.conf, ")"))))
+
+  # =========================================================================
+  LAYER_DF = as.data.frame(LAYER)
+
+  # PLOT VARIOGRAM ==========================================================
+  VAR_DF = as.data.frame(var.model)[c("model", "psill", "range", "kappa")]
+  VAR_DF = round_df(VAR_DF, 4)
+
+  pv1 = plot_variogram(vg, var_model, Model, color.ramp = color.ramp)
   pv2 = ggplot() +
     theme_void() +
-    annotate(geom='table', x=1, y=1, label=list(VAR_DF), size=4)
+    annotate(geom = 'table', x = 1, y = 1, label = list(VAR_DF), size = 4)
   fig_variogram = cowplot::plot_grid(pv1, pv2, nrow = 2, ncol = 1, rel_heights = c(6, 1) ) +
     theme(plot.background = element_rect(fill = "white", colour = NA))
 
-  # PLOT KRIGING =========================================
+  # PLOT KRIGING ===========================================================
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
-  # remove NA's
-#   PRED_RASTER_DF = PRED_RASTER_DF[!is.na(PRED_RASTER_DF$var1.pred),]
   max_pred = max(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
   min_pred = min(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
-  LAYER_DF = as.data.frame(LAYER)
 
-#   pr = str2lang(names(PRED_RASTER_DF)[3])
-
-  mask_layer = if(!is.null(Mask_layer) & plot.mask) {
-    list(geom_sf(data = mask_crop, fill = NA,
+  # MASK ====================================================================
+  mask_layer = if(!is.null(mask.layer) & plot.mask) {
+    list(geom_sf(data = mask.layer, fill = NA,
                  linewidth = mask.conf[[1]],
-                 color = mask.conf[[2]] ))
+                 color = mask.conf[[2]] )
+    )
   } else list(NULL)
 
-  contour_layer = if(!is.null(contour.lines)) {
-    list(geom_sf(data=contour.lines,
-                 linewidth = contour.conf[[1]],  color = contour.conf[[2]]
-                 ))
-  } else list(NULL)
+  # CONTOUR =================================================================
+  if(plot.contour)
+  {
+    CONTOUR = rasterToContour(PRED_RASTER)
+    contour_lines = st_as_sf(CONTOUR)
+    contour_lines = list(geom_sf(data = contour_lines,
+            linewidth = contour.conf[[1]],  color = contour.conf[[2]] ))
 
+  } else {
+    contour_lines = NULL
+  }
+
+  # POINTS ==================================================================
   point = if(Insert_points) {
-    list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white"))
+    list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape = 21, fill="white")
+    )
   } else list(NULL)
 
+  # FIG PREDICTION ==========================================================
   fig_pred = ggplot() +
     theme_bw() +
     geom_raster(data = PRED_RASTER_DF, aes(x = x, y = y, fill = var1.pred), na.rm = TRUE) +
     mask_layer +
-    contour_layer +
+    contour_lines +
     point +
-    scale_fill_gradientn(colors = color_ramp, na.value = NA, limits = c(min_pred,max_pred)) +
-#     scale_fill_palette_c(color_ramp) +
-    scale_y_continuous(expand = expansion(mult=0.02)) +
-    scale_x_continuous(expand = expansion(mult=0.02)) +
+    scale_fill_gradientn(colors = color.ramp, na.value = NA, limits = c(min_pred, max_pred)) +
+    scale_y_continuous(expand = expansion(mult = fy)) +
+    scale_x_continuous(expand = expansion(mult = fx)) +
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
     theme(axis.text.y = element_text(angle=90, hjust=.5),
+          plot.title = element_text(size=11),
+          plot.subtitle = element_text(size=9, face="italic"),
+          plot.caption = element_text(size=8, face="italic"),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
+    labs(#title = paste(tit,"- Prediction"),
+         caption = crs_txt(LAYER),
+         x = "longitude",
+         y = "latitude",
+         fill = Field)
 
-  # =========================================================================
-  if(FALSE)
-  {
-    #   library(RColorBrewer)
-    PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
-    max_pred = max(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
-    min_pred = min(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
-    LAYER_DF = as.data.frame(LAYER)
-    #   PRED_RASTER_DF = PRED_RASTER_DF[!is.na(PRED_RASTER_DF$var1.pred),]
-
-    N_colors = 10
-    digits = 3
-    #   myPallette = c(hcl.colors(9, "YlOrRd", rev=F), "white", hcl.colors(9, "Blues", rev=T))
-
-    cut_brks <- base::cut(PRED_RASTER_DF$var1.pred,
-                          breaks = seq(min_pred, max_pred, len = N_colors),
-                          dig.lab = digits)
-    level_brks = levels(cut_brks)
-    lower = as.numeric( sub("\\((.+),.*", "\\1", level_brks) )
-    upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", level_brks) )
-    labels_brks = if(F) paste0("-  [", lower, ", ", upper,"]") else  paste0("-  ", lower)
-    brks = c(lower, max(upper))
-
-    ggplot(PRED_RASTER_DF, aes(x = x, y = y)) +
-      scale_fill_manual(values = palette_colors("Spectral", n = N_colors),
-                        na.value = "transparent",
-                        na.translate = FALSE,
-                        guide = guide_legend(reverse = TRUE)) +
-      geom_raster(aes(fill = base::cut(var1.pred, breaks = brks, labels = labels_brks)), na.rm = TRUE) +
-      scale_y_continuous(expand = expansion(mult=0.02)) +
-      scale_x_continuous(expand = expansion(mult=0.02)) +
-      coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
-      theme(
-            legend.text  = element_text(margin = margin(l = 0)),
-            legend.title = element_text(margin = margin(b = 5))
-            ) +
-      labs(fill = Field)
-  }
-
-
-  # PLOT VARIOGRAM ========================================
+  # PLOT VARIOGRAM ==========================================================
   VAR_RASTER_DF = as.data.frame(VAR_RASTER, xy = TRUE)
   max_var = max(VAR_RASTER_DF$var1.var, na.rm = TRUE)
   min_var = min(VAR_RASTER_DF$var1.var, na.rm = TRUE)
-
-#   vr = str2lang(names(VAR_RASTER_DF)[3])
 
   fig_var = ggplot() +
     theme_bw() +
     geom_raster(data = VAR_RASTER_DF, aes(x = x, y = y, fill = var1.var), na.rm = TRUE) +
     mask_layer +
     ifelse(Insert_points, list(geom_point(data=LAYER_DF, aes(x = x, y = y), shape=21, fill="white")), list(NULL)) +
-    scale_fill_gradientn(colors = color_ramp, na.value = NA, limits = c(min_var,max_var)) +
-#     scale_fill_palette_c(color_ramp) +
-    scale_y_continuous(expand = expansion(mult=0.02)) +
-    scale_x_continuous(expand = expansion(mult=0.02)) +
+    scale_fill_gradientn(colors = color.ramp, na.value = NA, limits = c(min_var,max_var)) +
+    scale_y_continuous(expand = expansion(mult = fy)) +
+    scale_x_continuous(expand = expansion(mult = fx)) +
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
-    theme(axis.text.y = element_text(angle = 90, hjust = 0.5),
+    theme(axis.text.y = element_text(angle=90, hjust=.5),
+          plot.title = element_text(size=11),
+          plot.subtitle = element_text(size=9, face="italic"),
+          plot.caption = element_text(size=8, face="italic"),
           panel.grid.minor = element_blank(),
           panel.background = element_rect(fill = 'white')
           ) +
-    labs(x="longitude", y="latitude", caption = epsg_crs_txt, fill = Field)
+    labs(#title = paste(tit,"- Variance"),
+         caption = crs_txt(LAYER),
+         x = "longitude",
+         y = "latitude",
+         fill = Field)
 
   # CLOUD VARIOGRAM =========================================================
   # variogram calculation, cloud=TRUE is for cloud scatter
@@ -149,6 +140,11 @@ create_report = function(tit = "Kriging Interpolation",
 
 
   # CROSS VALIDATION ========================================================
+  # if larger than 1, then apply n-fold cross validation
+  if(n.fold < 2) n.fold = nrow(LAYER@data)
+
+  # Cross validation functions
+  KCV = krige.cv(frm, LAYER, var_model, nmax = Maximum, nfold = n.fold, verbose = FALSE)
   KCV_DF = as.data.frame(KCV)
   ST = get_stats(KCV)
   STAT = ST[['stats']]
@@ -179,8 +175,8 @@ create_report = function(tit = "Kriging Interpolation",
     theme_bw(12) +
     geom_point(aes(fill = residual, size = residual), alpha=.5, shape=21) +
     scale_size_area(max_size = 8) +
-    scale_fill_gradientn(colors = color_ramp, na.value = NA) +
-#     scale_fill_palette_c(color_ramp) +
+    scale_fill_gradientn(colors = color.ramp, na.value = NA) +
+#     scale_fill_palette_c(color.ramp) +
     guides(fill = guide_legend(), size = guide_legend()) +
     theme(plot.title = element_text(size = 12),
           legend.title = element_blank(),
@@ -310,8 +306,7 @@ create_report = function(tit = "Kriging Interpolation",
                         fig_pred = fig_pred,
                         fig_var = fig_var,
                         fig_cloud = fig_cloud,
-                        fig_stats = fig_stats,
-                        docx = docx)
+                        fig_stats = fig_stats)
   ))
 }
 

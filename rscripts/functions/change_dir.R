@@ -17,7 +17,6 @@ change_dir = function(arq, dir_path, dir_path_aux, pattern = "\\.rsx$")
   {
     list_files = list.files(dir_path, pattern = pattern, recursive = TRUE, full.names = TRUE)
     fp = grep(paste0(arq, collapse="|"), list_files, value = TRUE)
-#     fp = find_file(arq, dir_path, pattern = pattern)
     txt = readLines(fp)
     txt[txt == old_dir] <- new_dir
 
