@@ -46,8 +46,7 @@
 #'         : In blank the number generation is random.
 #' Create_Report: Create report with graphs.
 #' Open_Report: Open report.
-#' Color_Ramp_Report: Select color palette: Spectral, Turbo, Magma, Inferno, Plasma,
-#'                  : Viridis, Cividis, Rocket, Mako, Regions.
+#' Color_Ramp_Report: Select color palette: Spectral;Blues;Cividis;Greens;Grays;Magma;Mako;RdGy;Reds;Rocket;Turbo;Viridis;Inferno
 #' Invert_Color_Ramp: Invert color ramp.
 #' Draw_lines_variogram: Draw lines variogram.
 #' Plot_mask: Plot layer mask.
@@ -91,7 +90,8 @@
 
 ##Create_Report=boolean True
 ##Open_Report=boolean False
-##Color_Ramp_Report=enum literal Spectral;Turbo;Magma;Inferno;Plasma;Viridis;Cividis;Rocket;Mako;Regions ;
+##QgsProcessingParameterString|title_report|Title (Report)|Ordinary Kriging Interpolation
+##Color_Ramp_Report=enum literal Spectral;Blues;Cividis;Greens;Grays;Magma;Mako;RdGy;Reds;Rocket;Turbo;Viridis;Inferno ;
 ##QgsProcessingParameterBoolean|Invert_Color_Ramp|Invert color ramp (Report)|False
 ##QgsProcessingParameterBoolean|Insert_points|Insert points (Report)|True
 ##QgsProcessingParameterBoolean|Draw_lines_variogram|Draw lines variogram (Report)|False
@@ -101,6 +101,7 @@
 ##QgsProcessingParameterString|Contour_conf_report|Contour_conf (Report)|size = 0.5, color = 'gray50'
 ##QgsProcessingParameterNumber|Expand_longitude|Expand longitude (Report)|QgsProcessingParameterNumber.Double|0.02
 ##QgsProcessingParameterNumber|Expand_latitude|Expand latitude (Report)|QgsProcessingParameterNumber.Double|0.02
+##QgsProcessingParameterString|min_max_pred|Minimum and maximum prediction (Report)|auto
 ##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 
 ##Report=output file docx
@@ -123,7 +124,6 @@ set.seed(Set_Seed)
 
 # READ PACKAGES ====================================
 packages = c("gstat", "sp", "sf", "automap", "raster",
-             "paletteer", "palettes", "viridis",
              "officer", "cowplot", "ggrepel",
              "ggpmisc", "ggplot2")
 
@@ -368,10 +368,10 @@ Resolution = tryCatch(abs(as.integer(Resolution)),
       a = (Extent[2] - Extent[1])^2
       b = (Extent[4] - Extent[3])^2
       hyp = sqrt(a + b)
-      kr = if(any(Block_size > 0)) 250 else 500
+      kr = if(any(Block_size > 0)) 450 else 600
       Resolution = as.integer(hyp/kr)
-      if(order_magnitude(hyp)[2] > 100000) Resolution = as.integer(Resolution * 1.5)
-      if(order_magnitude(hyp)[2] > 1000000) Resolution = as.integer(Resolution * 2.5)
+      if(order_magnitude(hyp)[2] > 100000) Resolution = as.integer(Resolution * 1.1)
+      if(order_magnitude(hyp)[2] > 1000000) Resolution = as.integer(Resolution * 2.0)
       Resolution
     })
 
@@ -411,10 +411,12 @@ OK_variance = VAR_RASTER
 OK_prediction = PRED_RASTER
 
 # INFO ================================================
+cat("\nConfig\n")
+cat("----------------------------------\n")
 printInfo()
 
 # REPORT ==============================================
-rp = create_report(tit = "Ordinary Kriging Interpolation",
+rp = create_report(tit = title_report,
                    LAYER,
                    PRED_RASTER,
                    VAR_RASTER,

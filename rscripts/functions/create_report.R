@@ -43,8 +43,21 @@ create_report = function(tit = "Kriging Interpolation",
 
   # PLOT KRIGING ===========================================================
   PRED_RASTER_DF = as.data.frame(PRED_RASTER, xy = TRUE)
-  max_pred = max(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
-  min_pred = min(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
+
+  if(min_max_pred == "auto")
+  {
+    max_pred = max(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
+    min_pred = min(PRED_RASTER_DF$var1.pred, na.rm = TRUE)
+  } else {
+
+    mm = tryCatch(as.numeric(unlist(strsplit(min_max_pred, ","))),
+                  warning = function(w) {
+                    c(min(PRED_RASTER_DF$var1.pred, na.rm = TRUE),
+                      max(PRED_RASTER_DF$var1.pred, na.rm = TRUE))
+             })
+    min_pred = mm[1]
+    max_pred = mm[2]
+  }
 
   # MASK ====================================================================
   mask_layer = if(!is.null(mask.layer) & plot.mask) {
@@ -72,6 +85,15 @@ create_report = function(tit = "Kriging Interpolation",
     )
   } else list(NULL)
 
+  tema = list(
+          theme(axis.text.y = element_text(angle=90, hjust=.5),
+                plot.title = element_text(size=11),
+                plot.subtitle = element_text(size=9, face="italic"),
+                plot.caption = element_text(size=8),
+                panel.grid.minor = element_blank(),
+                panel.background = element_rect(fill = 'white')
+          ))
+
   # FIG PREDICTION ==========================================================
   fig_pred = ggplot() +
     theme_bw() +
@@ -83,15 +105,9 @@ create_report = function(tit = "Kriging Interpolation",
     scale_y_continuous(expand = expansion(mult = fy)) +
     scale_x_continuous(expand = expansion(mult = fx)) +
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
-    theme(axis.text.y = element_text(angle=90, hjust=.5),
-          plot.title = element_text(size=11),
-          plot.subtitle = element_text(size=9, face="italic"),
-          plot.caption = element_text(size=8, face="italic"),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(#title = paste(tit,"- Prediction"),
-         caption = crs_txt(LAYER),
+    tema +
+    labs(title = tit,
+         caption = paste0("Prediction - ", crs_txt(LAYER)),
          x = "longitude",
          y = "latitude",
          fill = Field)
@@ -110,15 +126,9 @@ create_report = function(tit = "Kriging Interpolation",
     scale_y_continuous(expand = expansion(mult = fy)) +
     scale_x_continuous(expand = expansion(mult = fx)) +
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
-    theme(axis.text.y = element_text(angle=90, hjust=.5),
-          plot.title = element_text(size=11),
-          plot.subtitle = element_text(size=9, face="italic"),
-          plot.caption = element_text(size=8, face="italic"),
-          panel.grid.minor = element_blank(),
-          panel.background = element_rect(fill = 'white')
-          ) +
-    labs(#title = paste(tit,"- Variance"),
-         caption = crs_txt(LAYER),
+    tema +
+    labs(title = tit,
+         caption = paste0("Variance - ", crs_txt(LAYER)),
          x = "longitude",
          y = "latitude",
          fill = Field)
