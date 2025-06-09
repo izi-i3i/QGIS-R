@@ -123,7 +123,7 @@ set.seed(Set_Seed)
 
 # READ PACKAGES ========================================
 packages = c("gstat", "sp", "sf", "automap", "raster",
-             "officer", "cowplot", "ggrepel",
+             "officer", "cowplot", "ggrepel","palettes",
              "ggpmisc", "ggplot2")
 
 for (pac in packages)
