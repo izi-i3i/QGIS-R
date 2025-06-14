@@ -24,10 +24,6 @@ create_report = function(tit = "Kriging Interpolation",
   if(!create.report) return(NULL)
 
   # =========================================================================
-  mask.conf = eval(str2lang((paste("list(", mask.conf, ")"))))
-  contour.conf = eval(str2lang((paste("list(", contour.conf, ")"))))
-
-  # =========================================================================
   LAYER_DF = as.data.frame(LAYER)
 
   # PLOT VARIOGRAM ==========================================================
@@ -60,6 +56,8 @@ create_report = function(tit = "Kriging Interpolation",
   }
 
   # MASK ====================================================================
+  mask.conf = eval(str2lang((paste("list(", mask.conf, ")"))))
+ 
   mask_layer = if(!is.null(mask.layer) & plot.mask) {
     list(geom_sf(data = mask.layer, fill = NA,
                  linewidth = mask.conf[[1]],
@@ -68,6 +66,8 @@ create_report = function(tit = "Kriging Interpolation",
   } else list(NULL)
 
   # CONTOUR =================================================================
+  contour.conf = eval(str2lang((paste("list(", contour.conf, ")"))))
+
   if(plot.contour)
   {
     CONTOUR = rasterToContour(PRED_RASTER)
@@ -88,7 +88,7 @@ create_report = function(tit = "Kriging Interpolation",
   tema = list(
           theme(axis.text.y = element_text(angle=90, hjust=.5),
                 plot.title = element_text(size=11),
-                plot.subtitle = element_text(size=9, face="italic"),
+                plot.subtitle = element_text(size=9),
                 plot.caption = element_text(size=8),
                 panel.grid.minor = element_blank(),
                 panel.background = element_rect(fill = 'white')
@@ -107,7 +107,8 @@ create_report = function(tit = "Kriging Interpolation",
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
     tema +
     labs(title = tit,
-         caption = paste0("Prediction - ", crs_txt(LAYER)),
+         subtitle = "Prediction",
+         caption =  crs_txt(LAYER),
          x = "longitude",
          y = "latitude",
          fill = Field)
@@ -128,12 +129,13 @@ create_report = function(tit = "Kriging Interpolation",
     coord_sf(crs = CRS_Layer, datum = CRS_Layer, expand = TRUE, clip = "off") +
     tema +
     labs(title = tit,
-         caption = paste0("Variance - ", crs_txt(LAYER)),
+         subtitle = "Variance",
+         caption = crs_txt(LAYER),
          x = "longitude",
          y = "latitude",
          fill = Field)
 
-  # CLOUD VARIOGRAM =========================================================
+  # PLOT CLOUD ==============================================================
   # variogram calculation, cloud=TRUE is for cloud scatter
   meuse.varioc <- variogram(frm, LAYER, cloud=TRUE)
 
@@ -230,18 +232,16 @@ create_report = function(tit = "Kriging Interpolation",
   cap_table_stat = "Accuracy of kriging results."
   cap_table_exp_var = "Exp var."
 
-  cap_fig_g1 = paste("Leave-One-Out Cross-Validation (LOOCV) for the",
-                     model_fit, "model validation.")
+  #"Leave-One-Out Cross-Validation (LOOCV) for the",
+  cap_fig_g1 = paste("Cross-Validation", model_fit, "model validation.")
   cap_fig_fig_variogram = paste0(model_fit, "model fitted to residual values from the first-order trend surface.")
   cap_fig_fig_pred = paste("Final result of interpolation, the prediction map.")
-  cap_fig_fig_var = "Final result of interpolation, the variance open.report error map."
+  cap_fig_fig_var = "Final result of interpolation, the variance map."
   cap_fig_fig_cloud = paste("Variogram Cloud -", Field)
-#   cap_fig_p5 = paste("Clip kriging -", Field)
 
   run_num = run_autonum(seq_id = "fig", pre_label = "Figure ", bkm = "figure")
   run_num_table = run_autonum(seq_id = "tab", pre_label = "Table ", bkm = "table")
 
-  # =========================================================================
 #   cap = capture.output(summary(warnings()))
 # NOTE: "Verificar erro PCDATA invalid Char value 27 [9], provocado pelo warning do ggplot2
 
@@ -295,10 +295,10 @@ create_report = function(tit = "Kriging Interpolation",
     body_add_gg(value = fig_var, width = 6.3, height = 6.3, res=150) |>
     body_add_caption(value = block_caption(cap_fig_fig_var, style = "Normal", autonum = run_num)) |>
 
-    body_add_break() |>
-
 #     body_add_par(value = "Warnings", style = "heading 1") |>
 #     body_add(value =  cap, style = "Normal") |>
+
+    body_add_break() |>
 
     body_add_par(value = "Session Info", style = "heading 1") |>
     body_add(value = capture.output(sessionInfo()), style = "Normal") |>

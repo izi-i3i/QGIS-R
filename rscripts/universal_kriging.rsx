@@ -72,6 +72,7 @@
 ##Extent=optional extent
 ##CRS_Extent=expression @project_crs
 ##qgis_version=expression @qgis_version
+##proj_basename=expression @project_basename
 
 ##Grid_method=enum literal Rectangle;Convex hull;Polygon ;
 ##Block_size=string "0"
@@ -417,6 +418,7 @@ cat("----------------------------------\n")
 printInfo()
 
 # REPORT ===============================================
+title_report = paste("Kriging Interpolation", "-", proj_basename)
 rp = create_report(tit = title_report,
                    LAYER,
                    PRED_RASTER,

@@ -1,13 +1,13 @@
 #-------------------------------------------
 # Author  : Izi (izi31416@protonmail.com)
 # Project :
-# Created :
+# Created : qua 04 jun 2025 15:29:34
 # License :
 # Updated :
 #-------------------------------------------
-round_df <- function(x, dig = 4)
+order_magnitude = function(x)
 {
-    numeric_columns <- sapply(x, class) == 'numeric'
-    x[numeric_columns] <-  round(x[numeric_columns], dig)
-    x
+  n1 = 10^(floor(log10(x)))
+  n2 = 10^(ceiling(log10(x)))
+  c(n1=n1, n2=n2)
 }

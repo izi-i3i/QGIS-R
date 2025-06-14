@@ -61,10 +61,11 @@
 #' OK_prediction: Kriging predicted value (raster)
 #' ALG_CREATOR: <a href='https://github.com/izi-i3i/QGIS-R/'>izi-i3i</a>
 #' ALG_HELP_CREATOR: izi-i3i
-#' ALG_VERSION: 0.1.1
+#' ALG_VERSION: 0.0.1
 
-##Ordinary Kriging=name
+##Kriging=name
 ##[QGIS-R 2025-0.1.0]=group
+##Method_kriging=enum literal Ordinary;Universal ;
 ##QgsProcessingParameterFeatureSource|Layer|Layer vector|0|None|False
 ##QgsProcessingParameterCrs|CRS_Layer|CRS Layer (Planar coordenates)|EPSG:3857
 ##QgsProcessingParameterFeatureSource|Mask_layer|Mask Layer|2|None|True
@@ -91,7 +92,6 @@
 
 ##Create_Report=boolean True
 ##Open_Report=boolean False
-##QgsProcessingParameterString|title_report|Title (Report)|Ordinary Kriging Interpolation
 ##Color_Ramp_Report=enum literal Spectral;Blues;Cividis;Greens;Grays;Magma;Mako;RdGy;Reds;Rocket;Turbo;Viridis;Inferno ;
 ##QgsProcessingParameterBoolean|Invert_Color_Ramp|Invert color ramp (Report)|False
 ##QgsProcessingParameterBoolean|Insert_points|Insert points (Report)|True
@@ -106,8 +106,8 @@
 ##QgsProcessingParameterFile|rscripts_folder|Path to rscript folder|1||~/.local/share/QGIS/QGIS3|True
 
 ##Report=output file docx
-##OK_variance=output raster
-##OK_prediction=output raster
+##K_variance=output raster
+##K_prediction=output raster
 
 # ter 03 jun 2025 20:12:05
 #-----------------------------------------------
@@ -309,7 +309,11 @@ if(ln > 15 | sum(pn) > 0)
 }
 
 # VARIOGRAM ========================================
-form = 'Field ~ 1'
+form = switch(Method_kriging,
+  Ordinary =  'Field ~ 1',
+  Universal = 'Field ~ x+y'
+  )
+
 frm = formula(form)
 gs = gstat(id = Field, formula = frm, data = LAYER)
 
@@ -410,8 +414,8 @@ if (!is.null(Mask_layer))
 }
 
 # OUT RASTER ==========================================
-OK_variance = VAR_RASTER
-OK_prediction = PRED_RASTER
+K_variance = VAR_RASTER
+K_prediction = PRED_RASTER
 
 # INFO ================================================
 cat("\nConfig\n")
@@ -419,7 +423,7 @@ cat("----------------------------------\n")
 printInfo()
 
 # REPORT ==============================================
-title_report = paste("Kriging Interpolation", "-", proj_basename)
+title_report = paste(Method_kriging, "Kriging Interpolation", "-", proj_basename)
 rp = create_report(tit = title_report,
                    LAYER,
                    PRED_RASTER,
